@@ -32,6 +32,10 @@ ExportedObj/
 *.pch
 *.log
 *.tlog
+*.idb
+*.ilk
+*.exp
+*.filters
 
 # Unity3D generated meta files
 *.pidb.meta
