@@ -3,65 +3,98 @@
 
 #include <iostream>
 #include <type_traits>
+#include <map>
 using namespace std;
 
-typedef unsigned char U8;
+////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////
 
-template<typename T>
-struct IsSelfSerializableIn
+class ICompressionMethod
 {
-    template< typename U, bool (U::*)(const U8*, int&, int networkVersion) > struct signature;
-    template< typename U > static char& HasSerialize(signature< U, &U::SerializeIn >*);
-    template< typename U > static int& HasSerialize(...);
-    static const bool value = sizeof(char) == sizeof(HasSerialize<T>(0));
+public:
+    ICompressionMethod() = default;
+    virtual ~ICompressionMethod() = default;
+
+    virtual void Compress() = 0;
 };
 
-/*template <typename T>
-struct Data;
+////////////////////////////////////////////////////////////////////////
 
-template <>
-struct Data<int> {
-    static void print(int val)
-    {
-        cout << val << endl;
-    }
-};
-
-template <typename T, std::size_t N>
-struct Data<T[N]> {
-    static void print(T val)
-    {
-        for(auto i: val)
-        {
-            cout << i << endl;
-        }
-    }
-   // const T(&val)[N];
-};
-
-template<typename T>
-inline void print(T val)
+class CompressionMethodFactory
 {
-    Data<T>::print(val);
+public:
+    using TCreateMethod = unique_ptr<ICompressionMethod>(*)();
+
+public:
+    CompressionMethodFactory() = delete;
+
+    static bool Register(const string& name, TCreateMethod funcCreate);
+
+    static unique_ptr<ICompressionMethod> Create(const string& name);
+
+private:
+    static map<string, TCreateMethod> s_methods;
+};
+
+////////////////////////////////////////////////////////////////////////
+
+map<string, CompressionMethodFactory::TCreateMethod> CompressionMethodFactory::s_methods;
+
+////////////////////////////////////////////////////////////////////////
+
+bool CompressionMethodFactory::Register(const string& name, CompressionMethodFactory::TCreateMethod funcCreate)
+{
+    if (auto it = s_methods.find(name); it == s_methods.end())
+    { // C++17 init-if ^^
+        s_methods[name] = funcCreate;
+        return true;
+    }
+    return false;
 }
-template<typename T, std::size_t N>
-inline void print(T val)
+
+////////////////////////////////////////////////////////////////////////
+
+class ZipCompression : public ICompressionMethod
 {
-    Data<T, N>::print(val);
-}*/
+public:
+    virtual void Compress() override
+    {
+        cout << "Zip" << endl;
+    }
 
-template<typename T>   void print(T& t) { cout << t << endl; }
-template<typename T, int N> void print(T(&t)[N]) { for (auto i : t) print(i);  }
+    static unique_ptr<ICompressionMethod> CreateMethod() {
+        return make_unique<ZipCompression>();
+    }
+    static std::string GetFactoryName() { return "ZIP"; }
 
+private:
+    static bool s_registered;
+};
+
+////////////////////////////////////////////////////////////////////////
+
+unique_ptr<ICompressionMethod>
+CompressionMethodFactory::Create(const string& name)
+{
+    if (auto it = s_methods.find(name); it != s_methods.end())
+        return it->second(); // call the createFunc
+
+    return nullptr;
+}
+
+////////////////////////////////////////////////////////////////////////
+
+bool ZipCompression::s_registered = CompressionMethodFactory::Register(ZipCompression::GetFactoryName(), ZipCompression::CreateMethod);
+
+////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////
 
 int main()
 {
-    int val1 = 0;
-    print(val1);
+    
+    auto method = CompressionMethodFactory::Create("ZIP");
+    method.get()->Compress();
 
-    int val2 [3] = { 3, 2, 1 };
-    //std::cout << std::extent<val2>::value << '\n';
-    print(val2);
 
     std::cout << "Hello World!\n";
 }
