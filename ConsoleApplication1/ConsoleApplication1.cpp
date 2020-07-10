@@ -5,6 +5,7 @@
 #include <type_traits>
 #include <map>
 using namespace std;
+typedef unsigned char U8;
 
 ////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////
@@ -20,33 +21,48 @@ public:
 
 ////////////////////////////////////////////////////////////////////////
 
-class CompressionMethodFactory
+class PacketMethodFactory
 {
 public:
     using TCreateMethod = unique_ptr<ICompressionMethod>(*)();
 
 public:
-    CompressionMethodFactory() = delete;
+    PacketMethodFactory() = delete;
 
     static bool Register(const string& name, TCreateMethod funcCreate);
+    static bool Register(U8 type, U8 subType, TCreateMethod funcCreate);
 
     static unique_ptr<ICompressionMethod> Create(const string& name);
+    static unique_ptr<ICompressionMethod> Create(U8 type, U8 subType);
 
 private:
     static map<string, TCreateMethod> s_methods;
+    static map<pair<U8, U8>, TCreateMethod> s_creatorMethods;
 };
 
 ////////////////////////////////////////////////////////////////////////
 
-map<string, CompressionMethodFactory::TCreateMethod> CompressionMethodFactory::s_methods;
+map<string, PacketMethodFactory::TCreateMethod> PacketMethodFactory::s_methods;
+map<pair<U8, U8>, PacketMethodFactory::TCreateMethod> PacketMethodFactory::s_creatorMethods;
 
 ////////////////////////////////////////////////////////////////////////
 
-bool CompressionMethodFactory::Register(const string& name, CompressionMethodFactory::TCreateMethod funcCreate)
+bool PacketMethodFactory::Register(const string& name, PacketMethodFactory::TCreateMethod funcCreate)
 {
     if (auto it = s_methods.find(name); it == s_methods.end())
     { // C++17 init-if ^^
         s_methods[name] = funcCreate;
+        return true;
+    }
+    return false;
+}
+
+bool PacketMethodFactory::Register(U8 type, U8 subType, TCreateMethod funcCreate)
+{
+    auto matchPair = pair<U8, U8>(type, subType);
+    if(auto it = s_creatorMethods.find(matchPair); it == s_creatorMethods.end())
+    { // C++17 init-if ^^
+        s_creatorMethods[matchPair] = funcCreate;
         return true;
     }
     return false;
@@ -66,25 +82,38 @@ public:
         return make_unique<ZipCompression>();
     }
     static std::string GetFactoryName() { return "ZIP"; }
+    static U8 Type() { return 0; }
+    static U8 SubType() { return 1; }
 
 private:
     static bool s_registered;
+    static bool s_typeRegistered;
 };
 
 ////////////////////////////////////////////////////////////////////////
 
 unique_ptr<ICompressionMethod>
-CompressionMethodFactory::Create(const string& name)
+PacketMethodFactory::Create(const string& name)
 {
     if (auto it = s_methods.find(name); it != s_methods.end())
         return it->second(); // call the createFunc
 
     return nullptr;
 }
+////////////////////////////////////////////////////////////////////////
+
+unique_ptr<ICompressionMethod>
+PacketMethodFactory::Create(U8 type, U8 subType)
+{
+    if (auto it = s_creatorMethods.find(pair<U8, U8>(type, subType)); it != s_creatorMethods.end())
+        return it->second(); // call the createFunc
+    return nullptr;
+}
 
 ////////////////////////////////////////////////////////////////////////
 
-bool ZipCompression::s_registered = CompressionMethodFactory::Register(ZipCompression::GetFactoryName(), ZipCompression::CreateMethod);
+bool ZipCompression::s_registered = PacketMethodFactory::Register(ZipCompression::GetFactoryName(), ZipCompression::CreateMethod);
+bool ZipCompression::s_typeRegistered = PacketMethodFactory::Register(ZipCompression::Type(), ZipCompression::SubType(), ZipCompression::CreateMethod);
 
 ////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////
@@ -92,8 +121,11 @@ bool ZipCompression::s_registered = CompressionMethodFactory::Register(ZipCompre
 int main()
 {
     
-    auto method = CompressionMethodFactory::Create("ZIP");
+    auto method = PacketMethodFactory::Create("ZIP");
     method.get()->Compress();
+
+    auto method2 = PacketMethodFactory::Create(0, 1);
+    method2.get()->Compress();
 
 
     std::cout << "Hello World!\n";
