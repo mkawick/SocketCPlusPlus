@@ -1,0 +1,137 @@
+// BasePacket.h
+
+#pragma once
+#include "./CommonTypes.h"
+#include "../NetworkUtils.h"
+#include "../General/FixedLengthString.h"
+
+//#define _MEMLEAK_TESTING_
+
+#pragma pack(push,4)
+
+extern const U8   NetworkVersionMajor;
+extern const U8   NetworkVersionMinor;
+
+///////////////////////////////////////////////////////////////
+
+// todo, make login, logout, etc into authentication packets
+enum PacketType
+{
+    PacketType_Base,
+    PacketType_Login,
+    PacketType_Movement,
+    PacketType_Chat,
+    PacketType_UserInfo,
+    PacketType_Contact,
+    PacketType_Asset,
+    PacketType_UserStateChange, // from server to client, usually
+    PacketType_DbQuery,
+    PacketType_Gameplay,
+    PacketType_GatewayWrapper,
+    PacketType_ServerToServerWrapper,
+    PacketType_ServerJobWrapper,
+    PacketType_ServerInformation,
+    PacketType_GatewayInformation, // user logged out, prepare to shutdown, etc.
+    PacketType_ErrorReport,
+    PacketType_Cheat,
+    PacketType_Purchase,
+    PacketType_Tournament,
+    PacketType_Analytics,
+    PacketType_Notification,
+    PacketType_Invitation,
+    PacketType_UserStats,
+    PacketType_Num
+}; 
+
+///////////////////////////////////////////////////////////////
+
+class IBinarySerializable
+{
+public:
+#ifdef _MEMORY_TEST_
+    PacketDebug()
+    {
+        m_counter++;
+        cout << "BasePacket +count: " << m_counter << endl;
+    }
+    virtual ~PacketDebug()
+    {
+        m_counter--;
+        cout << "BasePacket ~count: " << m_counter << endl;
+    }
+    static int      m_counter;
+#else
+
+#endif
+    virtual bool  SerializeIn(const U8* data, int& bufferOffset, int minorVersion) = 0;
+    virtual bool  SerializeOut(U8* data, int& bufferOffset, int minorVersion = NetworkVersionMinor) const = 0;
+};
+
+///////////////////////////////////////////////////////////////
+
+class BasePacket : public IBinarySerializable
+{
+public:
+    enum SubType 
+    {
+        BasePacket_Type,
+        BasePacket_Hello,
+        BasePacket_CommsHandshake,
+        BasePacket_RerouteRequest,
+        BasePacket_RerouteRequestResponse,
+        BasePacket_QOS,
+        BasePacket_TestOnly
+    };
+public:
+    BasePacket( int packet_type = PacketType_Base, int packet_sub_type = BasePacket_Type ) :
+        packetType( packet_type ),
+        packetSubType( packet_sub_type ),
+        gameProductId( 0 ),
+        versionNumberMajor( NetworkVersionMajor ),
+        versionNumberMinor( NetworkVersionMinor ),
+        //packetSize( 0 ),
+        gameInstanceId( 0 )
+        {
+
+        }
+    virtual ~BasePacket()
+    {
+        gameInstanceId = 0;// for a place to set breakpoints.
+    }
+
+    void WritePacketBasics(BasePacket* dest)
+    {
+        dest->gameProductId = gameProductId;
+        dest->versionNumberMajor = versionNumberMajor;
+        dest->versionNumberMinor = versionNumberMinor;
+        dest->gameInstanceId = gameInstanceId;
+    }
+    void CopyPacketBasics(const BasePacket& source)
+    {
+        gameProductId = source.gameProductId;
+        versionNumberMajor = source.versionNumberMajor;
+        versionNumberMinor = source.versionNumberMinor;
+        gameInstanceId = source.gameInstanceId;
+    }
+
+    bool  SerializeIn( const U8* data, int& bufferOffset, int minorVersion );
+    bool  SerializeOut( U8* data, int& bufferOffset, int minorVersion = NetworkVersionMinor ) const;
+
+    U8       packetType;
+    U8       packetSubType;
+    U8       gameProductId;
+    U8       versionNumberMajor;
+    U8       versionNumberMinor;
+    U8       padding[3];// this will not be serialized
+    U32      gameInstanceId;
+    
+
+    static int   GetSize();
+};
+
+///////////////////////////////////////////////////////////////
+
+
+///////////////////////////////////////////////////////////////
+
+///////////////////////////////////////////////////////////////
