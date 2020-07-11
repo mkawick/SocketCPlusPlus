@@ -4,6 +4,7 @@
 #include <iostream>
 #include <type_traits>
 #include <map>
+#include "../UDP01/OldCode/General/CircularBuffer.h"
 using namespace std;
 typedef unsigned char U8;
 
@@ -17,6 +18,12 @@ public:
     virtual ~ICompressionMethod() = default;
 
     virtual void Compress() = 0;
+
+public: // all part of the factory interface
+
+    virtual string GetName() = 0;
+    virtual U8 GetType() = 0;
+    virtual U8 GetSubType() = 0;
 };
 
 ////////////////////////////////////////////////////////////////////////
@@ -29,45 +36,132 @@ public:
 public:
     PacketMethodFactory() = delete;
 
-    static bool Register(const string& name, TCreateMethod funcCreate);
-    static bool Register(U8 type, U8 subType, TCreateMethod funcCreate);
+    static void Init();
+    static void Shutdown();
 
     static unique_ptr<ICompressionMethod> Create(const string& name);
-    static unique_ptr<ICompressionMethod> Create(U8 type, U8 subType);
+    static unique_ptr <ICompressionMethod> Create(U8 type, U8 subType);
+
+    //---------------------------------------------------------------
+    static bool Release(unique_ptr <ICompressionMethod>& data);
+
 
 private:
     static map<string, TCreateMethod> s_methods;
-    static map<pair<U8, U8>, TCreateMethod> s_creatorMethods;
+    static map<pair<U8, U8>, TCreateMethod> s_allocationMethods;
+    static map<pair<U8, U8>, circular_buffer<unique_ptr <ICompressionMethod>>* > s_creationPool;
+
+    static unique_ptr <ICompressionMethod> Allocate(U8 type, U8 subType);
+
+public:
+    static bool Register(const string& name, U8 type, U8 subType, TCreateMethod funcCreate);
 };
 
 ////////////////////////////////////////////////////////////////////////
 
 map<string, PacketMethodFactory::TCreateMethod> PacketMethodFactory::s_methods;
-map<pair<U8, U8>, PacketMethodFactory::TCreateMethod> PacketMethodFactory::s_creatorMethods;
+map<pair<U8, U8>, PacketMethodFactory::TCreateMethod> PacketMethodFactory::s_allocationMethods;
+map<pair<U8, U8>, circular_buffer<unique_ptr <ICompressionMethod>>* > PacketMethodFactory::s_creationPool;
 
 ////////////////////////////////////////////////////////////////////////
 
-bool PacketMethodFactory::Register(const string& name, PacketMethodFactory::TCreateMethod funcCreate)
+void PacketMethodFactory::Init()
 {
+    for (auto it = s_allocationMethods.begin(); it != s_allocationMethods.end(); it++)
+    {
+        auto typePair = it->first;
+        int numToCreate = 100;
+
+        auto buff = new circular_buffer< unique_ptr <ICompressionMethod>>(numToCreate);
+
+        for (int i = 0; i < numToCreate; i++)
+        {
+            auto pointer = PacketMethodFactory::Allocate(typePair.first, typePair.second);
+            buff->put(std::move(pointer));
+        }
+        s_creationPool[typePair] = buff;
+    }
+}
+
+void PacketMethodFactory::Shutdown()
+{
+    for (auto it = s_creationPool.begin(); it != s_creationPool.end(); it++)
+    {
+        delete it->second;
+    }
+}
+
+bool PacketMethodFactory::Register(const string& name, U8 type, U8 subType, TCreateMethod funcCreate)
+{
+    bool success = false;
+    auto matchPair = pair<U8, U8>(type, subType);
+    if(auto it = s_allocationMethods.find(matchPair); it == s_allocationMethods.end())
+    { // C++17 init-if ^^
+        s_allocationMethods[matchPair] = funcCreate;
+        success = true;
+    }
     if (auto it = s_methods.find(name); it == s_methods.end())
     { // C++17 init-if ^^
         s_methods[name] = funcCreate;
-        return true;
+        success = true;
     }
-    return false;
+    return success;
 }
 
-bool PacketMethodFactory::Register(U8 type, U8 subType, TCreateMethod funcCreate)
+////////////////////////////////////////////////////////////////////////
+
+unique_ptr<ICompressionMethod>
+PacketMethodFactory::Create(const string& name)
 {
-    auto matchPair = pair<U8, U8>(type, subType);
-    if(auto it = s_creatorMethods.find(matchPair); it == s_creatorMethods.end())
-    { // C++17 init-if ^^
-        s_creatorMethods[matchPair] = funcCreate;
-        return true;
+    if (auto it = s_methods.find(name); it != s_methods.end())
+
+    {
+        auto temp = it->second(); // call the createFunc
+        U8 type = temp.get()->GetType();
+        U8 subType = temp.get()->GetSubType();
+        return Create(type, subType); // use the memory pool
     }
-    return false;
+
+    return nullptr;
+}
+////////////////////////////////////////////////////////////////////////
+
+unique_ptr <ICompressionMethod>
+PacketMethodFactory::Create(U8 type, U8 subType)
+{
+    if (auto it = s_creationPool.find(pair<U8, U8>(type, subType)); it != s_creationPool.end())
+    {
+        return it->second->get();// find open pointer
+    }
+
+    _ASSERT(0, "could not match the requested type");
+}
+////////////////////////////////////////////////////////////////////////
+
+unique_ptr <ICompressionMethod>
+PacketMethodFactory::Allocate(U8 type, U8 subType)
+{
+    if (auto it = s_allocationMethods.find(pair<U8, U8>(type, subType)); it != s_allocationMethods.end())
+    {
+        auto alloc = it->second();// call the createFunc
+        return alloc;
+    }
+    return nullptr;
 }
 
+bool PacketMethodFactory::Release(unique_ptr <ICompressionMethod>& data)
+{
+    U8 type = data.get()->GetType();
+    U8 subType = data.get()->GetSubType();
+    if (auto it = s_creationPool.find(pair<U8, U8>(type, subType)); it != s_creationPool.end())
+    {
+        it->second->put(std::move(data));
+        return true;
+    }
+
+    return false;
+}
+////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////
 
 class ZipCompression : public ICompressionMethod
@@ -78,56 +172,42 @@ public:
         cout << "Zip" << endl;
     }
 
+private:  // <Boilerplate that every class will need to implement> //
+    string GetName() override { return GetFactoryName(); }
+    U8 GetType() override { return Type(); }
+    U8 GetSubType() override { return SubType(); }
+
     static unique_ptr<ICompressionMethod> CreateMethod() {
         return make_unique<ZipCompression>();
     }
-    static std::string GetFactoryName() { return "ZIP"; }
+    static string GetFactoryName() { return "ZIP"; }
     static U8 Type() { return 0; }
     static U8 SubType() { return 1; }
 
-private:
-    static bool s_registered;
     static bool s_typeRegistered;
 };
 
 ////////////////////////////////////////////////////////////////////////
 
-unique_ptr<ICompressionMethod>
-PacketMethodFactory::Create(const string& name)
-{
-    if (auto it = s_methods.find(name); it != s_methods.end())
-        return it->second(); // call the createFunc
-
-    return nullptr;
-}
-////////////////////////////////////////////////////////////////////////
-
-unique_ptr<ICompressionMethod>
-PacketMethodFactory::Create(U8 type, U8 subType)
-{
-    if (auto it = s_creatorMethods.find(pair<U8, U8>(type, subType)); it != s_creatorMethods.end())
-        return it->second(); // call the createFunc
-    return nullptr;
-}
-
-////////////////////////////////////////////////////////////////////////
-
-bool ZipCompression::s_registered = PacketMethodFactory::Register(ZipCompression::GetFactoryName(), ZipCompression::CreateMethod);
-bool ZipCompression::s_typeRegistered = PacketMethodFactory::Register(ZipCompression::Type(), ZipCompression::SubType(), ZipCompression::CreateMethod);
+bool ZipCompression::s_typeRegistered = PacketMethodFactory::Register(ZipCompression::GetFactoryName(), ZipCompression::Type(), ZipCompression::SubType(), ZipCompression::CreateMethod);
 
 ////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////
 
 int main()
 {
-    
+    PacketMethodFactory::Init();
+
     auto method = PacketMethodFactory::Create("ZIP");
     method.get()->Compress();
 
     auto method2 = PacketMethodFactory::Create(0, 1);
     method2.get()->Compress();
 
+    PacketMethodFactory::Release(method);
+    PacketMethodFactory::Release(method2);
 
+    PacketMethodFactory::Shutdown();
     std::cout << "Hello World!\n";
 }
 

@@ -17,7 +17,7 @@ public:
 	{
 		std::lock_guard<std::mutex> lock(mutex_);
 
-		buf_[head_] = item;
+		buf_[head_] = std::move(item);
 
 		if (full_)
 		{
@@ -39,7 +39,7 @@ public:
 		}
 
 		//Read data and advance the tail (we now have a free space)
-		auto val = buf_[tail_];
+		auto val = std::move(buf_[tail_]);
 		full_ = false;
 		tail_ = (tail_ + 1) % max_size_;
 
@@ -98,7 +98,7 @@ private:
 	bool full_ = 0;
 };
 
-int main(void)
+int main2(void)
 {
 	circular_buffer<uint32_t> circle(10);
 	printf("\n === CPP Circular buffer check ===\n");
