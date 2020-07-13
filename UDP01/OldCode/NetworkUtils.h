@@ -60,6 +60,10 @@ namespace Network
             const int maskZ = quantizationZ - 1, maskY = quantizationY - 1, maskX = quantizationX - 1;
 
         };
+        namespace Float
+        {
+            const float shift = 512;
+        };
 
         namespace Position
         {

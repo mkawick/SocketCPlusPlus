@@ -1,5 +1,5 @@
 #pragma once
-
+#include <cmath>
 
 
 ///////////////////////////////////////////////////////////////
@@ -9,21 +9,30 @@ struct Vector3
     float x, y, z;
     Vector3() : x(0), y(0), z(0) {}
     Vector3(float _x, float _y, float _z) : x(_x), y(_y), z(_z) {}
+
+    float magnitude() const { return std::sqrt(x * x + y * y + z * z); }
+
+    void operator *= (float mag) 
+    {
+        x *= mag; 
+        y *= mag; 
+        z *= mag; 
+    }
 };
 
 ///////////////////////////////////////////////////////////////
 
-class RotationPacker : public IBinarySerializable// using 360 degrees as an integer
+class RotationCompressed : public IBinarySerializable// using 360 degrees as an integer
 {
 public:
     int rotation;
 
-    RotationPacker()
+    RotationCompressed()
     {
         rotation = 0;
     }
 
-    void CopyFrom(RotationPacker ext)
+    void CopyFrom(RotationCompressed ext)
     {
         rotation = ext.rotation;
     }
@@ -40,7 +49,6 @@ private:
 };
 
 ///////////////////////////////////////////////////////////////
-
 
 class PositionCompressed : public IBinarySerializable
 {
@@ -67,36 +75,61 @@ private:
 
 ///////////////////////////////////////////////////////////////
 
-class PositionPacket : public BasePacket
+class FloatCompressed
 {
 public:
+    void Set(float pos);
+    float Get();
+
+private:
+    U16 value;
+};
+
+///////////////////////////////////////////////////////////////
+
+class ServerTickPacket : public BasePacket
+{
 public:
     enum SubType
     {
-        PositionPacket_Position,
-        PositionPacket_Movement
+        ServerTick_Base,
+        ServerTick_Position,
+        ServerTick_Movement
     };
 public:
-    PositionPacket(int packet_type = PacketType_Movement, int packet_sub_type = PositionPacket_Position) : BasePacket(packet_type, packet_sub_type) {}
+    ServerTickPacket(int packet_sub_type = ServerTick_Base) : BasePacket(PacketType_ServerTick, packet_sub_type), serverTick(0){}
+    bool    SerializeIn(const U8* data, int& bufferOffset, int minorVersion);
+    bool    SerializeOut(U8* data, int& bufferOffset, int minorVersion) const;
+
+    U16 serverTick;
+};
+///////////////////////////////////////////////////////////////
+
+class PositionPacket : public ServerTickPacket
+{
+public:
+    PositionPacket(int packet_sub_type = ServerTick_Position) : ServerTickPacket(packet_sub_type) {}
     bool    SerializeIn(const U8* data, int& bufferOffset, int minorVersion);
     bool    SerializeOut(U8* data, int& bufferOffset, int minorVersion) const;
     void    Set(const Vector3& position, const Vector3& direction);
     void    Get(Vector3& position, Vector3& direction);
 
+
     PositionCompressed positionCompressed;
-    RotationPacker rotationCompressed;
+    RotationCompressed rotationCompressed;
 };
 ///////////////////////////////////////////////////////////////
 
 class MovementPacket : public PositionPacket
 {
 public:
-    MovementPacket() : PositionPacket(PacketType_Movement, PositionPacket_Movement) {}
+    MovementPacket() : PositionPacket(ServerTick_Movement) {}
     bool    SerializeIn(const U8* data, int& bufferOffset, int minorVersion);
     bool    SerializeOut(U8* data, int& bufferOffset, int minorVersion) const;
     void    Set(const Vector3& position, const Vector3& direction, const Vector3& movementDir);
     void    Get(Vector3& position, Vector3& direction, Vector3& movementDir);
 
-    RotationPacker movementDirCompressed;
+    RotationCompressed  movementDirCompressed;
+    //FloatCompressed     movementMagnitudeCompressed;
 };
 ///////////////////////////////////////////////////////////////

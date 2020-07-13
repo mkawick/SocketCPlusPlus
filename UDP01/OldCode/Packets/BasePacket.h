@@ -19,7 +19,7 @@ enum PacketType
 {
     PacketType_Base,
     PacketType_Login,
-    PacketType_Movement,
+    PacketType_ServerTick,
     PacketType_Chat,
     PacketType_UserInfo,
     PacketType_Contact,
@@ -99,14 +99,14 @@ public:
         gameInstanceId = 0;// for a place to set breakpoints.
     }
 
-    void WritePacketBasics(BasePacket* dest)
+    void WriteTo(BasePacket* dest)
     {
         dest->gameProductId = gameProductId;
         dest->versionNumberMajor = versionNumberMajor;
         dest->versionNumberMinor = versionNumberMinor;
         dest->gameInstanceId = gameInstanceId;
     }
-    void CopyPacketBasics(const BasePacket& source)
+    void CopyFrom(const BasePacket& source)
     {
         gameProductId = source.gameProductId;
         versionNumberMajor = source.versionNumberMajor;
@@ -122,8 +122,8 @@ public:
     U8       gameProductId;
     U8       versionNumberMajor;
     U8       versionNumberMinor;
-    U8       padding[3];// this will not be serialized
-    U32      gameInstanceId;
+    U8       padding[1];// this will not be serialized
+    U16      gameInstanceId;
     
 
     static int   GetSize();

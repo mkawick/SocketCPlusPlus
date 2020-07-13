@@ -224,11 +224,13 @@ namespace UnitTestBasicNetworking
 			Assert::AreEqual(bp.gameProductId, inPacket.gameProductId);
 			Assert::AreEqual(bp.versionNumberMajor, inPacket.versionNumberMajor);
 			Assert::AreEqual(bp.versionNumberMinor, inPacket.versionNumberMinor);
-			Assert::AreEqual(bp.gameInstanceId, inPacket.gameInstanceId);
+			Assert::AreEqual((int)bp.gameInstanceId, (int)inPacket.gameInstanceId);
 		}
 
 		TEST_METHOD(BasicMovementPacketTest)
 		{
+		//todo: needs unit tests for set, get, and serializing the magnitude of movement
+
 			U8 buffer[100];
 			float episilon = 0.001f;
 			MovementPacket bp;
@@ -238,9 +240,10 @@ namespace UnitTestBasicNetworking
 			bp.versionNumberMinor = 11;
 			bp.gameInstanceId = 01;
 			float x = 18, y = 32, z = 270;// to pass the tests, we need positive angles. rotation compressed converts everything into 0-511
-			bp.rotationCompressed.Set(Vector3(x, y, z));
 			float posX = 1, posY = 2, posZ = -3;
-			bp.positionCompressed.Set(Vector3(posX, posY, posZ));
+			float movX = 5, movY = 2, movZ = 0;
+			bp.Set(Vector3(posX, posY, posZ), Vector3(x, y, z), Vector3(movX, movY, movZ));
+			bp.serverTick = 25;
 
 			int outOffset = 0;
 			Serialize::Out(buffer, outOffset, bp, 1);
@@ -255,17 +258,21 @@ namespace UnitTestBasicNetworking
 			Assert::AreEqual(bp.gameProductId, inPacket.gameProductId);
 			Assert::AreEqual(bp.versionNumberMajor, inPacket.versionNumberMajor);
 			Assert::AreEqual(bp.versionNumberMinor, inPacket.versionNumberMinor);
-			Assert::AreEqual(bp.gameInstanceId, inPacket.gameInstanceId);
+			Assert::AreEqual((int)bp.gameInstanceId, (int)inPacket.gameInstanceId);
+			Assert::AreEqual((U32)bp.serverTick, (U32)inPacket.serverTick);
 
 			//float outx, outy, outz;
-			Vector3 resultPos = inPacket.positionCompressed.Get();
+			Vector3 resultPos, resultRot, resultMov;
+			inPacket.Get(resultPos, resultRot, resultMov);
 			Assert::IsTrue(abs(posX - resultPos.x) < episilon);
 			Assert::IsTrue(abs(posY - resultPos.y) < episilon);
 			Assert::IsTrue(abs(posZ - resultPos.z) < episilon);
-			Vector3 result = inPacket.rotationCompressed.Get();
-			Assert::IsTrue(abs(x - result.x) < episilon);
-			Assert::IsTrue(abs(y - result.y) < episilon);
-			Assert::IsTrue(abs(z - result.z) < episilon);
+			Assert::IsTrue(abs(x - resultRot.x) < episilon);
+			Assert::IsTrue(abs(y - resultRot.y) < episilon);
+			Assert::IsTrue(abs(z - resultRot.z) < episilon);
+			Assert::IsTrue(abs(movX - resultMov.x) < episilon);
+			Assert::IsTrue(abs(movY - resultMov.y) < episilon);
+			Assert::IsTrue(abs(movZ - resultMov.z) < episilon);
 		}
 
 		TEST_METHOD(Basic_PacketHeirarchyAndPointerTest)
@@ -275,14 +282,13 @@ namespace UnitTestBasicNetworking
 			Assert::AreEqual(bp->packetSubType, (U8)BasePacket::SubType::BasePacket_Type);
 
 			PositionPacket* pp = new PositionPacket();
-			Assert::AreEqual(pp->packetType, (U8)PacketType::PacketType_Movement);
-			Assert::AreEqual(pp->packetSubType, (U8)PositionPacket::SubType::PositionPacket_Position);
+			Assert::AreEqual(pp->packetType, (U8)PacketType::PacketType_ServerTick);
+			Assert::AreEqual(pp->packetSubType, (U8)ServerTickPacket::SubType::ServerTick_Position);
 
-			MovementPacket* mp = new MovementPacket();
-			Assert::AreEqual(mp->packetType, (U8)PacketType::PacketType_Movement);
-			Assert::AreEqual(mp->packetSubType, (U8)PositionPacket::SubType::PositionPacket_Movement);
-
-			
+			MovementPacket* mp = new MovementPacket(); 
+			Assert::AreEqual(mp->packetType, (U8)PacketType::PacketType_ServerTick);
+			Assert::AreEqual(mp->packetSubType, (U8)ServerTickPacket::SubType::ServerTick_Movement);
+						
 
 			U8 buffer[100];
 			float episilon = 0.001f;
@@ -291,8 +297,8 @@ namespace UnitTestBasicNetworking
 			bp->versionNumberMinor = 11;
 			bp->gameInstanceId = 01;
 
-			pp->CopyPacketBasics(*bp);
-			bp->WritePacketBasics(mp);
+			pp->CopyFrom(*bp);
+			bp->WriteTo(mp);
 			Assert::AreEqual(bp->gameProductId, pp->gameProductId);
 			Assert::AreEqual(bp->gameProductId, mp->gameProductId);
 			Assert::AreEqual(bp->versionNumberMinor, pp->versionNumberMinor);
@@ -400,7 +406,7 @@ namespace UnitTestBasicNetworking
 				Assert::AreEqual(bp[index].gameProductId, in.gameProductId);
 				Assert::AreEqual(bp[index].versionNumberMajor, in.versionNumberMajor);
 				Assert::AreEqual(bp[index].versionNumberMinor, in.versionNumberMinor);
-				Assert::AreEqual(bp[index].gameInstanceId, in.gameInstanceId);
+				Assert::AreEqual((int)bp[index].gameInstanceId, (int)in.gameInstanceId);
 
 				//float outx, outy, outz;
 				Vector3 resultPos = in.positionCompressed.Get();

@@ -4,64 +4,127 @@
 
 ///////////////////////////////////////////////////////////////
 
-bool  PositionPacket::SerializeIn(const U8* data, int& bufferOffset, int minorVersion)
+bool    ServerTickPacket::SerializeIn(const U8* data, int& bufferOffset, int minorVersion)
 {
     BasePacket::SerializeIn(data, bufferOffset, minorVersion);
+    Serialize::In(data, bufferOffset, serverTick, minorVersion);
+
+    return true;
+}
+bool    ServerTickPacket::SerializeOut(U8* data, int& bufferOffset, int minorVersion) const
+{
+    BasePacket::SerializeOut(data, bufferOffset, minorVersion);
+    Serialize::Out(data, bufferOffset, serverTick, minorVersion);
+
+    return true;
+}
+
+///////////////////////////////////////////////////////////////
+
+bool    PositionPacket::SerializeIn(const U8* data, int& bufferOffset, int minorVersion)
+{
+    ServerTickPacket::SerializeIn(data, bufferOffset, minorVersion);
     Serialize::In(data, bufferOffset, positionCompressed, minorVersion);
     Serialize::In(data, bufferOffset, rotationCompressed, minorVersion);
 
     return true;
 }
-bool  PositionPacket::SerializeOut(U8* data, int& bufferOffset, int minorVersion) const
+bool    PositionPacket::SerializeOut(U8* data, int& bufferOffset, int minorVersion) const
 {
-    BasePacket::SerializeOut(data, bufferOffset, minorVersion);
+    ServerTickPacket::SerializeOut(data, bufferOffset, minorVersion);
     Serialize::Out(data, bufferOffset, positionCompressed, minorVersion);
     Serialize::Out(data, bufferOffset, rotationCompressed, minorVersion);
 
     return true;
 }
 
+void    PositionPacket::Set(const Vector3& position, const Vector3& direction)
+{
+    positionCompressed.Set(position);
+    rotationCompressed.Set(direction);
+}
+void    PositionPacket::Get(Vector3& position, Vector3& direction)
+{
+    position = positionCompressed.Get();
+    direction = rotationCompressed.Get();
+}
 ///////////////////////////////////////////////////////////////
 
-bool  MovementPacket::SerializeIn(const U8* data, int& bufferOffset, int minorVersion)
+bool    MovementPacket::SerializeIn(const U8* data, int& bufferOffset, int minorVersion)
 {
     PositionPacket::SerializeIn(data, bufferOffset, minorVersion);
+    //Serialize::In(data, bufferOffset, movementMagnitudeCompressed, minorVersion);
     Serialize::In(data, bufferOffset, movementDirCompressed, minorVersion);
 
     return true;
 }
-bool  MovementPacket::SerializeOut(U8* data, int& bufferOffset, int minorVersion) const
+bool    MovementPacket::SerializeOut(U8* data, int& bufferOffset, int minorVersion) const
 {
     PositionPacket::SerializeOut(data, bufferOffset, minorVersion);
+    //Serialize::Out(data, bufferOffset, movementMagnitudeCompressed, minorVersion);
     Serialize::Out(data, bufferOffset, movementDirCompressed, minorVersion);
 
     return true;
 }
+void    MovementPacket::Set(const Vector3& position, const Vector3& direction, const Vector3& movementDir)
+{
+    PositionPacket::Set(position, direction);
+
+   /* float mag = movementDir.magnitude();
+    if (mag == 0)
+        mag = 0.0001f;
+    Vector3 dir = movementDir;
+    float mult = 1 / mag;
+    dir *= mult;*/
+    
+    //movementMagnitudeCompressed.Set(mag);
+    movementDirCompressed.Set(movementDir);
+}
+void    MovementPacket::Get(Vector3& position, Vector3& direction, Vector3& movementDir)
+{
+    PositionPacket::Get(position, direction);
+    movementDir = movementDirCompressed.Get();
+    //float mag = movementMagnitudeCompressed.Get();
+    //movementDir = movementDirCompressed;
+}
+///////////////////////////////////////////////////////////////
+
+void FloatCompressed::Set(float pos)
+{
+    _ASSERT(abs(pos * Network::Settings::Float::shift) < 16537);
+    value = static_cast<U16>(pos* Network::Settings::Float::shift);
+}
+float FloatCompressed::Get()
+{
+    float ret = value;
+    ret /= Network::Settings::Float::shift;
+    return ret;
+}
+
 ///////////////////////////////////////////////////////////////
 
 
-
-bool  RotationPacker::SerializeIn(const U8* data, int& bufferOffset, int minorVersion)
+bool  RotationCompressed::SerializeIn(const U8* data, int& bufferOffset, int minorVersion)
 {
     Serialize::In(data, bufferOffset, rotation, minorVersion);
 
     return true;
 }
-bool  RotationPacker::SerializeOut(U8* data, int& bufferOffset, int minorVersion) const
+bool  RotationCompressed::SerializeOut(U8* data, int& bufferOffset, int minorVersion) const
 {
     Serialize::Out(data, bufferOffset, rotation, minorVersion);
 
     return true;
 }
 
-void RotationPacker::Set(const Vector3& eulerAngles)
+void RotationCompressed::Set(const Vector3& eulerAngles)
 {
     int repAngleX = Network::Utils::ConvertDegToQuantitized(eulerAngles.x, Network::Settings::Rotation::quantizationX);
     int repAngleY = Network::Utils::ConvertDegToQuantitized(eulerAngles.y, Network::Settings::Rotation::quantizationY);
     int repAngleZ = Network::Utils::ConvertDegToQuantitized(eulerAngles.z, Network::Settings::Rotation::quantizationZ);
     rotation = Pack(repAngleX, repAngleY, repAngleZ);
 }
-Vector3 RotationPacker::Get()
+Vector3 RotationCompressed::Get()
 {
     int x = 0, y = 0, z = 0;
     Unpack(rotation, x, y, z);
@@ -70,13 +133,13 @@ Vector3 RotationPacker::Get()
         Network::Utils::ConvertToDeg(z, Network::Settings::Rotation::quantizationZ));
 }
 
-int RotationPacker::Pack(int x, int y, int z)
+int RotationCompressed::Pack(int x, int y, int z)
 {
     int result = (x << (Network::Settings::Rotation::shiftX + Network::Settings::Rotation::shiftY)) + (y << Network::Settings::Rotation::shiftY) + z;
     return result;
 }
 
-void RotationPacker::Unpack(int value, int& x, int& y, int& z)
+void RotationCompressed::Unpack(int value, int& x, int& y, int& z)
 {
     x = value & (Network::Settings::Rotation::maskX << (Network::Settings::Rotation::shiftY + Network::Settings::Rotation::shiftX));
     value -= x;
