@@ -11,6 +11,40 @@
 
 using namespace Microsoft::VisualStudio::CppUnitTestFramework;
 
+class FactoryMock
+{
+public:
+	FactoryMock() 
+	{ 
+		if(BasePacket::s_typeRegistered == false)
+		BasePacket::s_typeRegistered = PacketMethodFactory::Register(BasePacket::GetFactoryName(), BasePacket::Type(), BasePacket::SubType(), BasePacket::CreateMethod);
+		if(PositionPacket::s_typeRegistered == false)
+		PositionPacket::s_typeRegistered = PacketMethodFactory::Register(PositionPacket::GetFactoryName(), PositionPacket::Type(), PositionPacket::SubType(), PositionPacket::CreateMethod);
+		if(MovementPacket::s_typeRegistered == false)
+		MovementPacket::s_typeRegistered = PacketMethodFactory::Register(MovementPacket::GetFactoryName(), MovementPacket::Type(), MovementPacket::SubType(), MovementPacket::CreateMethod);
+
+		PacketMethodFactory::InitFactory();
+	}
+
+	~FactoryMock()
+	{
+		PacketMethodFactory::Shutdown();
+		BasePacket::s_typeRegistered = false;
+		PositionPacket::s_typeRegistered = false;
+		MovementPacket::s_typeRegistered = false;
+	}
+
+	unique_ptr<IPacketSerializable>  Create(string name)
+	{
+		return  PacketMethodFactory::Create(name);
+
+		
+	}
+	unique_ptr<IPacketSerializable>  Create(int type, int subType )
+	{
+		return PacketMethodFactory::Create(type, subType);
+	}
+};
 
 namespace UnitTestBasicNetworking
 {
@@ -425,6 +459,68 @@ namespace UnitTestBasicNetworking
 
 	TEST_CLASS(UnitTestBasicNetworking_PacketFactory)
 	{
+		FactoryMock* mock;
+		TEST_METHOD(___InitFactory)
+		{
+			
+			//PacketMethodFactory::InitFactory();
+		}
+		
+		TEST_METHOD(FactoryTest_Basics)
+		{
+			mock = new FactoryMock();
+			unique_ptr<IPacketSerializable> pack = PacketMethodFactory::Create("BasePacket");
+			pack.get()->GetName();
+
+			Assert::AreEqual((string)("BasePacket"), pack.get()->GetName());
+			Assert::AreEqual((U8)PacketType::PacketType_Base, pack.get()->GetType());
+			Assert::AreEqual((U8)BasePacket::BasePacket_Type, pack.get()->GetSubType());
+
+			PacketMethodFactory::Release(pack);
+			delete mock;
+
+			/*int outOffset = 0;
+			Serialize::Out(buffer, outOffset, bp, 1);
+
+			int inOffset = 0;
+			MovementPacket inPacket[numPackets];
+			Serialize::In(buffer, inOffset, inPacket, 1);*/
+		}
+		TEST_METHOD(FactoryTest_Basics2)
+		{
+			mock = new FactoryMock();
+			unique_ptr<IPacketSerializable> pack = PacketMethodFactory::Create("BasePacket");
+
+			Assert::AreEqual((string)("BasePacket"), pack.get()->GetName());
+			Assert::AreEqual((U8)PacketType::PacketType_Base, pack.get()->GetType());
+			Assert::AreEqual((U8)BasePacket::BasePacket_Type, pack.get()->GetSubType());
+
+			unique_ptr<IPacketSerializable> pack3 = PacketMethodFactory::Create("PositionPacket");
+			Assert::AreEqual((string)("PositionPacket"), pack3.get()->GetName());
+			Assert::AreEqual((U8)PacketType::PacketType_ServerTick, pack3.get()->GetType());
+			Assert::AreEqual((U8)ServerTickPacket::ServerTick_Position, pack3.get()->GetSubType());
+
+			unique_ptr<IPacketSerializable> pack2 = PacketMethodFactory::Create("MovementPacket");
+			Assert::AreEqual((string)("MovementPacket"), pack2.get()->GetName());
+			Assert::AreEqual((U8)PacketType::PacketType_ServerTick, pack2.get()->GetType());
+			Assert::AreEqual((U8)ServerTickPacket::ServerTick_Movement, pack2.get()->GetSubType());
+
+			PacketMethodFactory::Release(pack3);
+			PacketMethodFactory::Release(pack2);
+			PacketMethodFactory::Release(pack);
+			delete mock;
+
+			/*int outOffset = 0;
+			Serialize::Out(buffer, outOffset, bp, 1);
+
+			int inOffset = 0;
+			MovementPacket inPacket[numPackets];
+			Serialize::In(buffer, inOffset, inPacket, 1);*/
+		}
+		TEST_METHOD(ZZ_TeardownFactory)
+		{
+			
+		}
 	};
 	TEST_CLASS(UnitTestBasicNetworking_PacketMemoryPools)
 	{

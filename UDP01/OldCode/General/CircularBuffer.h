@@ -97,7 +97,7 @@ private:
 	const size_t max_size_;
 	bool full_ = 0;
 };
-
+/*ß
 int main2(void)
 {
 	circular_buffer<uint32_t> circle(10);
@@ -157,4 +157,4 @@ int main2(void)
 	printf("Full: %d\n", circle.full());
 
 	return 0;
-}
+}*/

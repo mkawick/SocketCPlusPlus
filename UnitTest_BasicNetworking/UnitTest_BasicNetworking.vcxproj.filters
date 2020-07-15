@@ -16,12 +16,12 @@
     <Filter Include="Packets">
       <UniqueIdentifier>{aa9f79bb-fa6e-4268-9176-f1ec99cef6a9}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Defaults">
+      <UniqueIdentifier>{cc9018b5-1ce9-42a5-9192-0ccffc670164}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="UnitTest_BasicNetworking.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="pch.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="..\UDP01\OldCode\Packets\BasePacket.cpp">
@@ -29,6 +29,12 @@
     </ClCompile>
     <ClCompile Include="..\UDP01\OldCode\Packets\MovementPacket.cpp">
       <Filter>Packets</Filter>
+    </ClCompile>
+    <ClCompile Include="..\UDP01\OldCode\Packets\PacketFactory.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="pch.cpp">
+      <Filter>Defaults</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

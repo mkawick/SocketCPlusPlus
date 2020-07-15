@@ -1,12 +1,134 @@
 #pragma once
 
-#include "./PacketFactory.h"
+#include "PacketFactory.h"
 #include "BasePacket.h"
 #include "MovementPacket.h"
-#include "../General/CircularBuffer.h"
-#include <hash_map>
+
+#include <map>
 using namespace std;
 
+
+////////////////////////////////////////////////////////////////////////
+
+map<string, PacketMethodFactory::TCreateMethod> PacketMethodFactory::s_methods;
+map<pair<U8, U8>, PacketMethodFactory::TCreateMethod> PacketMethodFactory::s_allocationMethods;
+map<pair<U8, U8>, circular_buffer<unique_ptr <IPacketSerializable>>* > PacketMethodFactory::s_creationPool;
+
+////////////////////////////////////////////////////////////////////////
+
+void PacketMethodFactory::InitFactory()
+{
+    for (auto it = s_allocationMethods.begin(); it != s_allocationMethods.end(); it++)
+    {
+        auto typePair = it->first;
+        if (IsPoolAlreadyAllocated(typePair))
+            continue;
+
+        int numToCreate = 100;
+
+        auto buff = new circular_buffer< unique_ptr <IPacketSerializable>>(numToCreate);
+
+        for (int i = 0; i < numToCreate; i++)
+        {
+            auto pointer = PacketMethodFactory::Allocate(typePair.first, typePair.second);
+            buff->put(std::move(pointer));
+        }
+        s_creationPool[typePair] = buff;
+    }
+}
+
+bool PacketMethodFactory::IsPoolAlreadyAllocated(const pair<U8, U8>& typePair)
+{
+    if (auto it = s_creationPool.find(typePair); it != s_creationPool.end())// make sure that we are not calling init on 
+        return true;
+
+    return false;
+}
+
+void PacketMethodFactory::Shutdown()
+{
+    for (auto it = s_creationPool.begin(); it != s_creationPool.end(); it++)
+    {
+        delete it->second;
+    }
+    s_methods.clear();
+    s_creationPool.clear();
+    s_allocationMethods.clear();
+}
+
+bool PacketMethodFactory::Register(const string& name, U8 type, U8 subType, TCreateMethod funcCreate)
+{
+    bool success = false;
+    auto matchPair = pair<U8, U8>(type, subType);
+    if (auto it = s_allocationMethods.find(matchPair); it == s_allocationMethods.end())
+    { // C++17 init-if ^^
+        s_allocationMethods[matchPair] = funcCreate;
+        success = true;
+    }
+    if (auto it = s_methods.find(name); it == s_methods.end())
+    { // C++17 init-if ^^
+        s_methods[name] = funcCreate;
+        success = true;
+    }
+    return success;
+}
+
+////////////////////////////////////////////////////////////////////////
+
+
+bool PacketMethodFactory::Release(unique_ptr <IPacketSerializable>& data)
+{
+    U8 type = data.get()->GetType();
+    U8 subType = data.get()->GetSubType();
+    if (auto it = s_creationPool.find(pair<U8, U8>(type, subType)); it != s_creationPool.end())
+    {
+        it->second->put(std::move(data));
+        return true;
+    }
+
+    return false;
+}
+////////////////////////////////////////////////////////////////////////
+unique_ptr<IPacketSerializable>
+PacketMethodFactory::Create(const string& name)
+{
+    if (auto it = s_methods.find(name); it != s_methods.end())
+    {
+        auto temp = it->second(); // call the createFunc
+        U8 type = temp.get()->GetType();
+        U8 subType = temp.get()->GetSubType();
+        return Create(type, subType); // use the memory pool
+    }
+
+    return nullptr;
+}
+////////////////////////////////////////////////////////////////////////
+
+unique_ptr <IPacketSerializable>
+PacketMethodFactory::Create(U8 type, U8 subType)
+{
+    if (auto it = s_creationPool.find(pair<U8, U8>(type, subType)); it != s_creationPool.end())
+    {
+        return it->second->get();// find open pointer
+    }
+
+    _ASSERT(0);// , "could not match the requested type");
+    return nullptr;
+}
+////////////////////////////////////////////////////////////////////////
+
+unique_ptr <IPacketSerializable>
+PacketMethodFactory::Allocate(U8 type, U8 subType)
+{
+    if (auto it = s_allocationMethods.find(pair<U8, U8>(type, subType)); it != s_allocationMethods.end())
+    {
+        auto alloc = it->second();// call the createFunc
+        return alloc;
+    }
+    return nullptr;
+}
+////////////////////////////////////////////////////////////////////////
+/*
 PacketFactory::PacketFactory() 
 {
     hash_map<BasePacket::SubType, circular_buffer<BasePacket>*> mp;
@@ -40,89 +162,6 @@ bool	PacketFactory::Parse(const U8* bufferIn, int& bufferOffset, BasePacket** pa
     firstPassParse.SerializeIn(bufferIn, offset, networkMinorVersion);
     bool success = Create(firstPassParse.packetType, firstPassParse.packetSubType, packetOut);
 
-    /*  switch( firstPassParse.packetType )
-      {
-      case PacketType_Base:
-         {
-            success = ParseBasePacket( bufferIn, bufferOffset, subType, packetOut, networkMinorVersion );
-         }
-      case PacketType_Login:
-         {
-            success = ParseLogin( bufferIn, bufferOffset, subType, packetOut, networkMinorVersion );
-         }
-      case PacketType_Chat:
-         {
-            success = ParseChat( bufferIn, bufferOffset, subType, packetOut, networkMinorVersion );
-         }
-      case PacketType_UserInfo:
-         {
-            success = ParseUserInfo( bufferIn, bufferOffset, subType, packetOut, networkMinorVersion );
-         }
-      case PacketType_Contact:
-         {
-            success = ParseContact( bufferIn, bufferOffset, subType, packetOut, networkMinorVersion );
-         }
-      case PacketType_Asset:
-         {
-            success = ParseAsset( bufferIn, bufferOffset, subType, packetOut, networkMinorVersion );
-         }
-      case PacketType_DbQuery:
-         {
-            success = ParseDbQuery( bufferIn, bufferOffset, subType, packetOut, networkMinorVersion );
-         }
-      case PacketType_ServerToServerWrapper:
-         {
-            success = ParseServerToServerWrapper( bufferIn, bufferOffset, subType, packetOut, networkMinorVersion );
-         }
-      case PacketType_ServerInformation:
-         {
-            success = ParseServerInfo( bufferIn, bufferOffset, subType, packetOut, networkMinorVersion );
-         }
-      case PacketType_GatewayWrapper:
-         {
-            success = ParseGatewayWrapper( bufferIn, bufferOffset, subType, packetOut, networkMinorVersion );
-         }
-      case PacketType_Gameplay:
-         {
-            success = ParseGame( bufferIn, bufferOffset, subType, packetOut, networkMinorVersion );
-         }
-      case PacketType_ErrorReport:
-         {
-            // put here just to avoid a function call for only one type.
-            PacketErrorReport* error = new PacketErrorReport();
-            //error->SerializeIn( bufferIn, bufferOffset, networkMinorVersion );
-            *packetOut = error;
-            success = true;
-         }
-      case PacketType_Cheat:
-         {
-            success = ParseCheat( bufferIn, bufferOffset, subType, packetOut, networkMinorVersion );
-         }
-      case PacketType_Purchase:
-         {
-            success = ParsePurchase( bufferIn, bufferOffset, subType, packetOut, networkMinorVersion );
-         }
-      case PacketType_Analytics:
-         {
-            success = ParseAnalytics( bufferIn, bufferOffset, subType, packetOut, networkMinorVersion );
-         }
-      case PacketType_Tournament:
-         {
-            success = ParseTournament( bufferIn, bufferOffset, subType, packetOut, networkMinorVersion );
-         }
-      case PacketType_UserStats:
-         {
-            success = ParseUserStats( bufferIn, bufferOffset, subType, packetOut, networkMinorVersion );
-         }
-      case PacketType_Notification:
-         {
-            success = ParseNotification( bufferIn, bufferOffset, subType, packetOut, networkMinorVersion );
-         }
-      case PacketType_Invitation:
-         {
-            success = ParseInvitation( bufferIn, bufferOffset, subType, packetOut, networkMinorVersion );
-         }
-      }*/
 
     if (success && *packetOut)
     {
@@ -130,4 +169,4 @@ bool	PacketFactory::Parse(const U8* bufferIn, int& bufferOffset, BasePacket** pa
     }
 
     return success;
-}// be sure to check the return value
+}// be sure to check the return value*/

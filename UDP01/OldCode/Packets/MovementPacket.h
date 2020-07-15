@@ -101,6 +101,7 @@ public:
     bool    SerializeIn(const U8* data, int& bufferOffset, int minorVersion);
     bool    SerializeOut(U8* data, int& bufferOffset, int minorVersion) const;
 
+
     U16 serverTick;
 };
 ///////////////////////////////////////////////////////////////
@@ -117,6 +118,22 @@ public:
 
     PositionCompressed positionCompressed;
     RotationCompressed rotationCompressed;
+
+    //--------------------------------------------------
+public: // factory interface
+    static constexpr int   GetSize();
+
+    string GetName()    override { return GetFactoryName(); }
+    U8 GetType()        override { return Type(); }
+    U8 GetSubType()     override { return SubType(); }
+
+    static unique_ptr<IPacketSerializable> CreateMethod();
+
+    static string GetFactoryName() { return from_type<PositionPacket>(); }
+    static U8 Type() { return PacketType_ServerTick; }
+    static U8 SubType() { return ServerTick_Position; }
+
+    static bool s_typeRegistered;
 };
 ///////////////////////////////////////////////////////////////
 
@@ -131,5 +148,21 @@ public:
 
     RotationCompressed  movementDirCompressed;
     //FloatCompressed     movementMagnitudeCompressed;
+
+ //--------------------------------------------------
+public: // factory interface
+    static constexpr int   GetSize();
+
+    string GetName()    override { return GetFactoryName(); }
+    U8 GetType()        override { return Type(); }
+    U8 GetSubType()     override { return SubType(); }
+
+    static unique_ptr<IPacketSerializable> CreateMethod();
+
+    static string GetFactoryName() { return from_type<MovementPacket>(); }
+    static U8 Type() { return PacketType_ServerTick; }
+    static U8 SubType() { return ServerTick_Movement; }
+
+    static bool s_typeRegistered;
 };
 ///////////////////////////////////////////////////////////////

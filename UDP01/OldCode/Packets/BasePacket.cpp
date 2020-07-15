@@ -8,6 +8,7 @@
 
 #include "BasePacket.h"
 #include "Serialize.h"
+#include "PacketFactory.h"
 //#include "PacketFactory.h"
 #include <assert.h>
 
@@ -35,6 +36,12 @@ const char* GetPacketTypename(PacketType type)
 
     case PacketType_Login:
         return "Login";
+
+    case PacketType_ServerTick:
+        return "ServerTick";
+
+    case PacketType_NetworkProtocol:
+        return "NetworkProtocol";
 
     case PacketType_Chat:
         return "Chat";
@@ -104,12 +111,50 @@ const char* GetPacketTypename(PacketType type)
 ///////////////////////////////////////////////////////////////
 ///////////////////////////////////////////////////////////////
 
-int   BasePacket::GetSize()
+ // compiler forces me to make this function first due to reliance on it later.
+constexpr int BasePacket::GetSize()
 {
     return sizeof(BasePacket) -
-        3 - //sizeof( padding )
+        sizeof(padding) -
         sizeof(long*); // this accounts for the virtual pointer.
 }
+
+BasePacket::BasePacket(int packet_type, int packet_sub_type) :
+    packetType(packet_type),
+    packetSubType(packet_sub_type),
+    gameProductId(0),
+    versionNumberMajor(NetworkVersionMajor),
+    versionNumberMinor(NetworkVersionMinor),
+    //packetSize( 0 ),
+    gameInstanceId(0)
+{
+    const int predictedSize = sizeof(packetType) +
+                        sizeof(packetSubType) +
+                        sizeof(gameProductId) +
+                        sizeof(versionNumberMajor) +
+                        sizeof(versionNumberMinor) +
+                        sizeof(gameInstanceId);
+
+    const int featureSize = GetSize();
+    static_assert(GetSize() == predictedSize, "error");// this is meant to enforce maintenence as these values change
+}
+
+unique_ptr<IPacketSerializable>  BasePacket::CreateMethod()
+{
+    return make_unique<BasePacket>();
+}
+
+#ifdef _UNIT_TESTING_
+bool BasePacket::s_typeRegistered = false;
+#else
+bool BasePacket::s_typeRegistered = PacketMethodFactory::Register(BasePacket::GetFactoryName(), BasePacket::Type(), BasePacket::SubType(), BasePacket::CreateMethod);
+#endif
+
+BasePacket::~BasePacket()
+{
+    gameInstanceId = 0;// for a place to set breakpoints.
+}
+
 
 bool  BasePacket::SerializeIn(const U8* data, int& bufferOffset, int minorVersion)
 {
@@ -138,3 +183,27 @@ bool  BasePacket::SerializeOut(U8* data, int& bufferOffset, int minorVersion) co
 }
 
 ///////////////////////////////////////////////////////////////
+
+bool  SizePacket::SerializeIn(const U8* data, int& bufferOffset, int minorVersion)
+{
+    U8 type;
+    Serialize::In(data, bufferOffset, type, minorVersion);
+    U16 size;
+    Serialize::In(data, bufferOffset, size, minorVersion);
+    // needs the factory in place to deserialize the next packet
+    BasePacket* ptr = new BasePacket();
+    ptr->SerializeIn(data, bufferOffset, minorVersion);
+    
+    return true;
+}
+bool  SizePacket::SerializeOut(U8* data, int& bufferOffset, int minorVersion) const
+{
+    Serialize::Out(data, bufferOffset, (U8)PacketType_NetworkProtocol, minorVersion);
+    int pos = bufferOffset;
+    bufferOffset += sizeof(U16);
+    packet->SerializeOut(data, bufferOffset, minorVersion);
+    U16 size = bufferOffset - pos;
+    Serialize::Out(data, pos, size, minorVersion);
+
+    return true;
+}

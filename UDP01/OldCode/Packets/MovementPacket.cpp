@@ -21,6 +21,11 @@ bool    ServerTickPacket::SerializeOut(U8* data, int& bufferOffset, int minorVer
 
 ///////////////////////////////////////////////////////////////
 
+unique_ptr<IPacketSerializable>  PositionPacket::CreateMethod()
+{
+    return make_unique<PositionPacket>();
+}
+
 bool    PositionPacket::SerializeIn(const U8* data, int& bufferOffset, int minorVersion)
 {
     ServerTickPacket::SerializeIn(data, bufferOffset, minorVersion);
@@ -48,7 +53,12 @@ void    PositionPacket::Get(Vector3& position, Vector3& direction)
     position = positionCompressed.Get();
     direction = rotationCompressed.Get();
 }
-///////////////////////////////////////////////////////////////
+#ifdef _UNIT_TESTING_
+bool PositionPacket::s_typeRegistered = false;
+#else
+bool 
+#endif
+///////////////////////////////////////////////////////////////PositionPacket::s_typeRegistered = PacketMethodFactory::Register(PositionPacket::GetFactoryName(), PositionPacket::Type(), PositionPacket::SubType(), PositionPacket::CreateMethod);
 
 bool    MovementPacket::SerializeIn(const U8* data, int& bufferOffset, int minorVersion)
 {
@@ -87,6 +97,16 @@ void    MovementPacket::Get(Vector3& position, Vector3& direction, Vector3& move
     //float mag = movementMagnitudeCompressed.Get();
     //movementDir = movementDirCompressed;
 }
+
+unique_ptr<IPacketSerializable>  MovementPacket::CreateMethod()
+{
+    return make_unique<MovementPacket>();
+}
+#ifdef _UNIT_TESTING_
+bool MovementPacket::s_typeRegistered = false;
+#else
+bool MovementPacket::s_typeRegistered = PacketMethodFactory::Register(MovementPacket::GetFactoryName(), MovementPacket::Type(), MovementPacket::SubType(), MovementPacket::CreateMethod);
+#endif
 ///////////////////////////////////////////////////////////////
 
 void FloatCompressed::Set(float pos)

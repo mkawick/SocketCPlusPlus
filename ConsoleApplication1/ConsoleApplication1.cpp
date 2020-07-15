@@ -135,6 +135,7 @@ PacketMethodFactory::Create(U8 type, U8 subType)
     }
 
     _ASSERT(0, "could not match the requested type");
+    return nullptr;
 }
 ////////////////////////////////////////////////////////////////////////
 
@@ -196,6 +197,12 @@ bool ZipCompression::s_typeRegistered = PacketMethodFactory::Register(ZipCompres
 
 int main()
 {
+    string ret = "class BasePacket";
+    string search("class ");
+    size_t position = ret.find(search, 0);
+    if (position != string::npos)
+        ret.erase(position, search.length());
+
     PacketMethodFactory::Init();
 
     auto method = PacketMethodFactory::Create("ZIP");

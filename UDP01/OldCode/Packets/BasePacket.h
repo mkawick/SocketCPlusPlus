@@ -1,16 +1,19 @@
 // BasePacket.h
 
 #pragma once
+
+// 
+#include "./IBinarySerializable.h"
 #include "./CommonTypes.h"
 #include "../NetworkUtils.h"
 #include "../General/FixedLengthString.h"
-
+#include <memory>
 //#define _MEMLEAK_TESTING_
+using namespace std;
 
 #pragma pack(push,4)
 
-extern const U8   NetworkVersionMajor;
-extern const U8   NetworkVersionMinor;
+
 
 ///////////////////////////////////////////////////////////////
 
@@ -20,6 +23,7 @@ enum PacketType
     PacketType_Base,
     PacketType_Login,
     PacketType_ServerTick,
+    PacketType_NetworkProtocol,
     PacketType_Chat,
     PacketType_UserInfo,
     PacketType_Contact,
@@ -44,32 +48,20 @@ enum PacketType
 }; 
 
 ///////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////
 
-class IBinarySerializable
+class IPacketSerializable : public IBinarySerializable
 {
 public:
-#ifdef _MEMORY_TEST_
-    PacketDebug()
-    {
-        m_counter++;
-        cout << "BasePacket +count: " << m_counter << endl;
-    }
-    virtual ~PacketDebug()
-    {
-        m_counter--;
-        cout << "BasePacket ~count: " << m_counter << endl;
-    }
-    static int      m_counter;
-#else
-
-#endif
-    virtual bool  SerializeIn(const U8* data, int& bufferOffset, int minorVersion) = 0;
-    virtual bool  SerializeOut(U8* data, int& bufferOffset, int minorVersion = NetworkVersionMinor) const = 0;
+    virtual string GetName() = 0;
+    virtual U8 GetType() = 0;
+    virtual U8 GetSubType() = 0;
 };
 
 ///////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////
 
-class BasePacket : public IBinarySerializable
+class BasePacket : public IPacketSerializable
 {
 public:
     enum SubType 
@@ -80,24 +72,12 @@ public:
         BasePacket_RerouteRequest,
         BasePacket_RerouteRequestResponse,
         BasePacket_QOS,
-        BasePacket_TestOnly
+        BasePacket_TestOnly,
+        BasePacket_SizeWrapper
     };
 public:
-    BasePacket( int packet_type = PacketType_Base, int packet_sub_type = BasePacket_Type ) :
-        packetType( packet_type ),
-        packetSubType( packet_sub_type ),
-        gameProductId( 0 ),
-        versionNumberMajor( NetworkVersionMajor ),
-        versionNumberMinor( NetworkVersionMinor ),
-        //packetSize( 0 ),
-        gameInstanceId( 0 )
-        {
-
-        }
-    virtual ~BasePacket()
-    {
-        gameInstanceId = 0;// for a place to set breakpoints.
-    }
+    BasePacket(int packet_type = PacketType_Base, int packet_sub_type = BasePacket_Type);
+    virtual ~BasePacket();
 
     void WriteTo(BasePacket* dest)
     {
@@ -125,12 +105,35 @@ public:
     U8       padding[1];// this will not be serialized
     U16      gameInstanceId;
     
+    //--------------------------------------------------
+public: // factory interface
+    static constexpr int   GetSize();
 
-    static int   GetSize();
+    string GetName()    override { return GetFactoryName(); }
+    U8 GetType()        override { return Type(); }
+    U8 GetSubType()     override { return SubType(); }
+
+    static unique_ptr<IPacketSerializable> CreateMethod();
+
+    static string GetFactoryName() { return from_type<BasePacket>(); }
+    static U8 Type() { return PacketType_Base; }
+    static U8 SubType() { return BasePacket_Type; }
+
+    static bool s_typeRegistered;
 };
 
 ///////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////
 
+class SizePacket : public IPacketSerializable
+{
+public:
+    //PacketType_NetworkProtocol
+
+    bool  SerializeIn(const U8* data, int& bufferOffset, int minorVersion);
+    bool  SerializeOut(U8* data, int& bufferOffset, int minorVersion) const;
+    IBinarySerializable* packet;
+};
 
 ///////////////////////////////////////////////////////////////
 
