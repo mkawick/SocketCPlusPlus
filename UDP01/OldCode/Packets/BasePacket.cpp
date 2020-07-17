@@ -139,13 +139,12 @@ BasePacket::BasePacket(int packet_type, int packet_sub_type) :
     static_assert(GetSize() == predictedSize, "error");// this is meant to enforce maintenence as these values change
 }
 
-
-
-#ifdef _UNIT_TESTING_
+SelfRegistery(BasePacket)
+/*#ifdef _UNIT_TESTING_
 bool BasePacket::s_typeRegistered = false;
 #else
 bool BasePacket::s_typeRegistered = PacketMethodFactory::Register(BasePacket::GetFactoryName(), BasePacket::Type(), BasePacket::SubType(), BasePacket::CreateMethod);
-#endif
+#endif*/
 
 BasePacket::~BasePacket()
 {

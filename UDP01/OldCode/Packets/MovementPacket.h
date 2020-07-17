@@ -124,7 +124,7 @@ public: // factory interface
     static constexpr int   GetSize();
     FactoryBoilerplate(PositionPacket, PacketType_ServerTick, ServerTick_Position);
 
-    static bool s_typeRegistered;
+    //static bool s_typeRegistered;
 };
 ///////////////////////////////////////////////////////////////
 
@@ -145,6 +145,6 @@ public: // factory interface
     static constexpr int   GetSize();
     FactoryBoilerplate(MovementPacket, PacketType_ServerTick, ServerTick_Movement);
 
-    static bool s_typeRegistered;
+    //static bool s_typeRegistered;
 };
 ///////////////////////////////////////////////////////////////

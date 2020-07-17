@@ -74,7 +74,25 @@ static shared_ptr<IPacketSerializable>  CreateMethod() \
 IPacketSerializable* GetTypePtr() override { return this; }\
 static string GetFactoryName() { return from_type<C>(); }\
 static U8 Type() { return T; }\
-static U8 SubType() { return ST; }
+static U8 SubType() { return ST; }\
+static bool s_typeRegistered;
+
+
+#ifdef _UNIT_TESTING_
+#define SelfRegistery(ClassType)\
+    bool ClassType::s_typeRegistered = false;
+#else
+#define SelfRegistery(ClassType) \
+    bool ClassType::s_typeRegistered = PacketMethodFactory::Register(ClassType::GetFactoryName(), ClassType::Type(), ClassType::SubType(), ClassType::CreateMethod);
+#endif
+
+#ifdef _UNIT_TESTING_
+#define MockRegistery(ClassType)\
+if (ClassType::s_typeRegistered == false) \
+    ClassType::s_typeRegistered = PacketMethodFactory::Register(ClassType::GetFactoryName(), ClassType::Type(), ClassType::SubType(), ClassType::CreateMethod);
+#else
+#define MockRegistery(ClassType);
+#endif
 
 ///////////////////////////////////////////////////////////////
 ///////////////////////////////////////////////////////////////
@@ -142,7 +160,7 @@ public: // factory interface
     static U8 SubType() { return BasePacket_Type; }
     */
 
-    static bool s_typeRegistered;
+    
 };
 
 ///////////////////////////////////////////////////////////////

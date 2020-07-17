@@ -19,12 +19,9 @@ class FactoryMock
 public:
 	FactoryMock() 
 	{ 
-		if(BasePacket::s_typeRegistered == false)
-		BasePacket::s_typeRegistered = PacketMethodFactory::Register(BasePacket::GetFactoryName(), BasePacket::Type(), BasePacket::SubType(), BasePacket::CreateMethod);
-		if(PositionPacket::s_typeRegistered == false)
-		PositionPacket::s_typeRegistered = PacketMethodFactory::Register(PositionPacket::GetFactoryName(), PositionPacket::Type(), PositionPacket::SubType(), PositionPacket::CreateMethod);
-		if(MovementPacket::s_typeRegistered == false)
-		MovementPacket::s_typeRegistered = PacketMethodFactory::Register(MovementPacket::GetFactoryName(), MovementPacket::Type(), MovementPacket::SubType(), MovementPacket::CreateMethod);
+		MockRegistery(BasePacket);
+		MockRegistery(PositionPacket);
+		MockRegistery(MovementPacket);
 
 		PacketMethodFactory::InitFactory();
 	}
