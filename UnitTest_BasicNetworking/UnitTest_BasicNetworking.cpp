@@ -322,6 +322,43 @@ namespace UnitTestBasicNetworking
 			Assert::AreEqual(inValue[3], outValue4);*/
 		}
 	};
+	TEST_CLASS(UnitTestBasicNetworking_BoilerplateRewrite)
+	{
+		TEST_METHOD(BasicBasePacketTest)
+		{
+			FactoryMock* mock = new FactoryMock(); // just to initialize
+			U8 buffer[100];
+
+			BasePacket bp;
+			bp.packetSubType = BasePacket::SubType::BasePacket_Type;
+			bp.gameProductId = 13;
+			bp.versionNumberMajor = 56;
+			bp.versionNumberMinor = 11;
+			bp.gameInstanceId = 01;
+			Assert::AreEqual((U8)bp.Type(), (U8)PacketType::PacketType_Base);
+			Assert::AreEqual(bp.GetName(), string("BasePacket"));
+			Assert::AreEqual(bp.GetSubType(), (U8)BasePacket::SubType::BasePacket_Type);
+			Assert::IsTrue(bp.s_typeRegistered);
+			
+
+			int outOffset = 0;
+			Serialize::Out(buffer, outOffset, bp, 1);
+
+			int inOffset = 0;
+			BasePacket inPacket;
+			Serialize::In(buffer, inOffset, inPacket, 1);
+
+			Assert::AreEqual(inOffset, outOffset);
+			Assert::AreEqual(bp.packetType, inPacket.packetType);
+			Assert::AreEqual(bp.packetSubType, inPacket.packetSubType);
+			Assert::AreEqual(bp.gameProductId, inPacket.gameProductId);
+			Assert::AreEqual(bp.versionNumberMajor, inPacket.versionNumberMajor);
+			Assert::AreEqual(bp.versionNumberMinor, inPacket.versionNumberMinor);
+			Assert::AreEqual((int)bp.gameInstanceId, (int)inPacket.gameInstanceId);
+
+			delete mock;
+		}
+	};
 
 	TEST_CLASS(UnitTestBasicNetworking_MovementPacketsAndArrays)
 	{
@@ -702,7 +739,7 @@ namespace UnitTestBasicNetworking
 	TEST_CLASS(UnitTestBasicNetworking_PacketMemoryPools)
 	{
 		FactoryMock* mock;
-		TEST_METHOD(FactoryTest_Basics)
+		TEST_METHOD(FactoryTest_Basics_ValidateUniquenessAndProperPools)
 		{
 			mock = new FactoryMock();
 			const int num = 100;
@@ -710,55 +747,182 @@ namespace UnitTestBasicNetworking
 			for (int i = 0; i < num; i++)
 			{
 				shared_ptr<IPacketSerializable> pack = PacketMethodFactory::Create("BasePacket");
-				BasePacket* unpacked = dynamic_cast<BasePacket*>(pack.get());
+				
+				BasePacket* unpacked = dynamic_cast<BasePacket*>(pack->GetTypePtr());
 				packets[i] = pack;
 				unpacked->gameInstanceId = i;
 			}
 			// verfiy that every instance is unique
 			std::set<int> instanceIds;
+			BasePacket* bpTestInstance;
 			for (int i = 0; i < num; i++)
 			{
-				BasePacket* bp = dynamic_cast<BasePacket*>(packets[i].get());
+				BasePacket* bp = dynamic_cast<BasePacket*>(packets[i]->GetTypePtr());
 				Assert::IsTrue(instanceIds.find(bp->gameInstanceId) == instanceIds.end());
 				instanceIds.insert(bp->gameInstanceId);
+				bpTestInstance = bp;
 			}
 
-		/*	IPacketSerializable* packets2[num];
-			IPacketSerializable* packets3[num];
+			shared_ptr<IPacketSerializable> packets2[num];
+			shared_ptr<IPacketSerializable> packets3[num];
 			for (int i = 0; i < num; i++)
 			{
 				shared_ptr<IPacketSerializable> position = PacketMethodFactory::Create("PositionPacket");
 				shared_ptr<IPacketSerializable> movement = PacketMethodFactory::Create("MovementPacket");
 				PositionPacket* unpackedPosition = dynamic_cast<PositionPacket*>(position.get());
 				MovementPacket* unpackedMove = dynamic_cast<MovementPacket*>(movement.get());
-				packets2[i] = unpackedPosition;
+				packets2[i] = position;
 				unpackedPosition->gameInstanceId = i+200;
-				packets3[i] = unpackedMove;
+				packets3[i] = movement;
 				unpackedMove->gameInstanceId = i+400;
 			}
+
+
 			for (int i = 0; i < num; i++)
 			{
-				PositionPacket* bp = dynamic_cast<PositionPacket*>(packets2[i]);
+				PositionPacket* bp = dynamic_cast<PositionPacket*>(packets2[i]->GetTypePtr());
 				Assert::IsTrue(instanceIds.find(bp->gameInstanceId) == instanceIds.end());
 				instanceIds.insert(bp->gameInstanceId);
-				MovementPacket* bp2 = dynamic_cast<MovementPacket*>(packets3[i]);
+				MovementPacket* bp2 = dynamic_cast<MovementPacket*>(packets3[i]->GetTypePtr());
 				Assert::IsTrue(instanceIds.find(bp2->gameInstanceId) == instanceIds.end());
 				instanceIds.insert(bp2->gameInstanceId);
+			}
+
+			for (auto pack : packets)
+			{
+				PacketMethodFactory::Release(pack);
+				pack.reset();
+			}
+			for (auto pack : packets2)
+			{
+				PacketMethodFactory::Release(pack);
+				pack.reset();
+			}
+			for (auto pack : packets3)
+			{
+				PacketMethodFactory::Release(pack);
+				pack.reset();
+			}
+
+			// check bpTestInstance
+
+			delete mock;
+		}
+
+		TEST_METHOD(FactoryTest_Basics_DeleteItemsInMiddleOFPools)
+		{
+			mock = new FactoryMock();
+			const int num = 100;
+			shared_ptr<IPacketSerializable> packets[num];
+			for (int i = 0; i < num; i++)
+			{
+				shared_ptr<IPacketSerializable> pack = PacketMethodFactory::Create("BasePacket");
+
+				BasePacket* unpacked = dynamic_cast<BasePacket*>(pack->GetTypePtr());
+				packets[i] = pack;
+				unpacked->gameInstanceId = i;
+			}
+			for (int i=45; i<55; i++) // delete the middle
+			{
+				PacketMethodFactory::Release(packets[i]);
+				packets[i].reset();
+			}
+			for (int i = 45; i < 55; i++) // refil
+			{
+				shared_ptr<IPacketSerializable> pack = PacketMethodFactory::Create("BasePacket");
+				BasePacket* unpacked = dynamic_cast<BasePacket*>(pack->GetTypePtr());
+				packets[i] = pack;
+				unpacked->gameInstanceId = i+100;
+			}
+
+			for (int i = 0; i < 100; i+=2) // delete every other one
+			{
+				PacketMethodFactory::Release(packets[i]);
+				packets[i].reset();
+			}
+			for (int i = 0; i < 100; i+=2) // refil
+			{
+				shared_ptr<IPacketSerializable> pack = PacketMethodFactory::Create("BasePacket");
+				BasePacket* unpacked = dynamic_cast<BasePacket*>(pack->GetTypePtr());
+				packets[i] = pack;
+				unpacked->gameInstanceId = i + 200;
+			}
+			cout << "-------------------------------" << endl;
+			cout << "Post delete numbering" << endl;
+			for (int i = 0; i < num; i++)
+			{
+				BasePacket* bp = dynamic_cast<BasePacket*>(packets[i]->GetTypePtr());
+				cout << i << ":" << bp->gameInstanceId << endl;
+
+			}
+
+			cout << "-------------------------------" << endl;
+		/*	for (int i = 0; i < num; i++)
+			{
+				shared_ptr<IPacketSerializable> pack = PacketMethodFactory::Create("BasePacket");
+
+				BasePacket* unpacked = dynamic_cast<BasePacket*>(pack->GetTypePtr());
+				packets[i] = pack;
+				unpacked->gameInstanceId = i;
+			}
+			// verfiy that every instance is unique
+			std::set<int> instanceIds;
+			BasePacket* bpTestInstance;
+			for (int i = 0; i < num; i++)
+			{
+				BasePacket* bp = dynamic_cast<BasePacket*>(packets[i]->GetTypePtr());
+				Assert::IsTrue(instanceIds.find(bp->gameInstanceId) == instanceIds.end());
+				instanceIds.insert(bp->gameInstanceId);
+				bpTestInstance = bp;
+			}
+
+			shared_ptr<IPacketSerializable> packets2[num];
+			shared_ptr<IPacketSerializable> packets3[num];
+			for (int i = 0; i < num; i++)
+			{
+				shared_ptr<IPacketSerializable> position = PacketMethodFactory::Create("PositionPacket");
+				shared_ptr<IPacketSerializable> movement = PacketMethodFactory::Create("MovementPacket");
+				PositionPacket* unpackedPosition = dynamic_cast<PositionPacket*>(position.get());
+				MovementPacket* unpackedMove = dynamic_cast<MovementPacket*>(movement.get());
+				packets2[i] = position;
+				unpackedPosition->gameInstanceId = i + 200;
+				packets3[i] = movement;
+				unpackedMove->gameInstanceId = i + 400;
+			}
+
+
+			for (int i = 0; i < num; i++)
+			{
+				PositionPacket* bp = dynamic_cast<PositionPacket*>(packets2[i]->GetTypePtr());
+				Assert::IsTrue(instanceIds.find(bp->gameInstanceId) == instanceIds.end());
+				instanceIds.insert(bp->gameInstanceId);
+				MovementPacket* bp2 = dynamic_cast<MovementPacket*>(packets3[i]->GetTypePtr());
+				Assert::IsTrue(instanceIds.find(bp2->gameInstanceId) == instanceIds.end());
+				instanceIds.insert(bp2->gameInstanceId);
+			}
+
+			for (auto pack : packets)
+			{
+				PacketMethodFactory::Release(pack);
+				pack.reset();
+			}
+			for (auto pack : packets2)
+			{
+				PacketMethodFactory::Release(pack);
+				pack.reset();
+			}
+			for (auto pack : packets3)
+			{
+				PacketMethodFactory::Release(pack);
+				pack.reset();
 			}*/
-			/*shared_ptr<IPacketSerializable> pack = PacketMethodFactory::Create("BasePacket");
-			pack.get()->GetName();
 
-			Assert::AreEqual((string)("BasePacket"), pack.get()->GetName());
-			Assert::AreEqual((U8)PacketType::PacketType_Base, pack.get()->GetType());
-			Assert::AreEqual((U8)BasePacket::BasePacket_Type, pack.get()->GetSubType());
+			// check bpTestInstance
 
-			PacketMethodFactory::Release(pack);*/
 			delete mock;
 		}
 	};
-	TEST_CLASS(UnitTestBasicNetworking_PacketWrappers)
-	{
-	};
+	
 
 	TEST_CLASS(UnitTestBasicNetworking_StreamOfPackets)
 	{

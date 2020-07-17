@@ -21,10 +21,6 @@ bool    ServerTickPacket::SerializeOut(U8* data, int& bufferOffset, int minorVer
 
 ///////////////////////////////////////////////////////////////
 
-shared_ptr<IPacketSerializable>  PositionPacket::CreateMethod()
-{
-    return make_unique<PositionPacket>();
-}
 
 bool    PositionPacket::SerializeIn(const U8* data, int& bufferOffset, int minorVersion)
 {
@@ -98,10 +94,6 @@ void    MovementPacket::Get(Vector3& position, Vector3& direction, Vector3& move
     //movementDir = movementDirCompressed;
 }
 
-shared_ptr<IPacketSerializable>  MovementPacket::CreateMethod()
-{
-    return make_unique<MovementPacket>();
-}
 #ifdef _UNIT_TESTING_
 bool MovementPacket::s_typeRegistered = false;
 #else

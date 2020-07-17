@@ -60,7 +60,21 @@ public:
     virtual string GetName() = 0;
     virtual U8 GetType() = 0;
     virtual U8 GetSubType() = 0;
+    virtual IPacketSerializable* GetTypePtr() { return this; }
 };
+
+#define FactoryBoilerplate(C,T,ST)\
+string GetName()    override { return GetFactoryName(); }\
+U8 GetType()        override { return Type(); } \
+U8 GetSubType()     override { return SubType(); } \
+static shared_ptr<IPacketSerializable>  CreateMethod() \
+{\
+    return make_shared<C>();\
+}\
+IPacketSerializable* GetTypePtr() override { return this; }\
+static string GetFactoryName() { return from_type<C>(); }\
+static U8 Type() { return T; }\
+static U8 SubType() { return ST; }
 
 ///////////////////////////////////////////////////////////////
 ///////////////////////////////////////////////////////////////
@@ -113,15 +127,20 @@ public:
 public: // factory interface
     static constexpr int   GetSize();
 
+    FactoryBoilerplate(BasePacket, PacketType_Base, BasePacket_Type);
+    /*
     string GetName()    override { return GetFactoryName(); }
     U8 GetType()        override { return Type(); }
     U8 GetSubType()     override { return SubType(); }
-
-    static shared_ptr<IPacketSerializable> CreateMethod();
-
+    static shared_ptr<IPacketSerializable>  CreateMethod()
+    {
+        return make_unique<BasePacket>();
+    }
+    IPacketSerializable* GetTypePtr() override { return this; }
     static string GetFactoryName() { return from_type<BasePacket>(); }
     static U8 Type() { return PacketType_Base; }
     static U8 SubType() { return BasePacket_Type; }
+    */
 
     static bool s_typeRegistered;
 };

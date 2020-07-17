@@ -122,16 +122,7 @@ public:
     //--------------------------------------------------
 public: // factory interface
     static constexpr int   GetSize();
-
-    string GetName()    override { return GetFactoryName(); }
-    U8 GetType()        override { return Type(); }
-    U8 GetSubType()     override { return SubType(); }
-
-    static shared_ptr<IPacketSerializable> CreateMethod();
-
-    static string GetFactoryName() { return from_type<PositionPacket>(); }
-    static U8 Type() { return PacketType_ServerTick; }
-    static U8 SubType() { return ServerTick_Position; }
+    FactoryBoilerplate(PositionPacket, PacketType_ServerTick, ServerTick_Position);
 
     static bool s_typeRegistered;
 };
@@ -152,16 +143,7 @@ public:
  //--------------------------------------------------
 public: // factory interface
     static constexpr int   GetSize();
-
-    string GetName()    override { return GetFactoryName(); }
-    U8 GetType()        override { return Type(); }
-    U8 GetSubType()     override { return SubType(); }
-
-    static shared_ptr<IPacketSerializable> CreateMethod();
-
-    static string GetFactoryName() { return from_type<MovementPacket>(); }
-    static U8 Type() { return PacketType_ServerTick; }
-    static U8 SubType() { return ServerTick_Movement; }
+    FactoryBoilerplate(MovementPacket, PacketType_ServerTick, ServerTick_Movement);
 
     static bool s_typeRegistered;
 };
