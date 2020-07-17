@@ -175,8 +175,8 @@ namespace Serialize
         }
     };
     ////////////////////////////////////////////////////////////////
-   //          global entry points for serialization
-   ////////////////////////////////////////////////////////////////
+    //          global entry points for serialization
+    ////////////////////////////////////////////////////////////////
     template<typename T>
     inline void In(const U8* source, int& offset, T& value, int minorVersion)
     {
@@ -187,6 +187,7 @@ namespace Serialize
     {
         Serializer<T>::Out(dest, offset, value, minorVersion);
     }
+    
 
     template<typename T, int N>
     inline void In(const U8* source, int& offset, T (&value)[N], int minorVersion)

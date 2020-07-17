@@ -2,6 +2,9 @@
 //#include "stdafx.h"
 #include <CppUnitTest.h>
 #include <cstdlib>
+#include <iostream>
+#include <set>
+//using namespace std;
 
 #include "../UDP01/OldCode/Packets/Serialize.h"
 #include "../UDP01/OldCode/Packets/BasePacket.h"
@@ -34,24 +37,37 @@ public:
 		MovementPacket::s_typeRegistered = false;
 	}
 
-	unique_ptr<IPacketSerializable>  Create(string name)
+	shared_ptr<IPacketSerializable>  Create(string name)
 	{
 		return  PacketMethodFactory::Create(name);
 
 		
 	}
-	unique_ptr<IPacketSerializable>  Create(int type, int subType )
+	shared_ptr<IPacketSerializable>  Create(int type, int subType )
 	{
 		return PacketMethodFactory::Create(type, subType);
 	}
 };
+float Wrap(float value, float range)
+{
+	assert((value > -2000.f) && (value < 2000.0f));
+	while (value < 0)
+		value += range;
+	while (value >= range)
+		value -= range;
+	return value;
+}
+
+float AbsDiffWithWrap(float x1, float x2, float wrap)
+{
+	return abs(Wrap(x1, wrap) - Wrap(x2, wrap));
+}
 
 namespace UnitTestBasicNetworking
 {
 	TEST_CLASS(UnitTestBasicNetworking_Serialization)
 	{
 	public:
-		
 		TEST_METHOD(BasicU16Copy)
 		{
 			U8 buffer[100];
@@ -229,6 +245,82 @@ namespace UnitTestBasicNetworking
 			Assert::AreEqual(inValue[2], outValue3);
 			Assert::AreEqual(inValue[3], outValue4);
 		}
+
+		TEST_METHOD(TestRotationNormalizationAndQuantization)
+		{
+			//U8 buffer[100];
+
+			float epsilon = 0.5f;
+			PositionCompressed positionCompressed;
+			RotationCompressed rotationCompressed;
+			PositionCompressed moveCompressed;
+			Vector3 positionTest(1, 20, -3);
+			Vector3 rotationTest(20, 17, -20);
+			Vector3 rotationTest2(0, 0, -20);
+			float movX = 5, movY = 2, movZ = 0;
+			//bp.Set(Vector3(posX, posY, posZ), Vector3(x, y, z), Vector3(movX, movY, movZ));
+			Vector3 mov(movX, movY, movZ);
+			
+			positionCompressed.Set(positionTest);
+			rotationCompressed.Set(rotationTest2);
+			
+			auto retRot = rotationCompressed.Get();
+
+			Assert::AreEqual(retRot.x, rotationTest2.x);
+			Assert::AreEqual(retRot.y, rotationTest2.y);
+			//float diff = abs(Wrap(retRot.z, 360.0f) - Wrap(rotationTest2.z, 360.0f));
+			Assert::IsTrue(AbsDiffWithWrap(retRot.z, rotationTest2.z, 360.0f) <epsilon);
+
+
+			// check full range
+			float largest = 0;
+			epsilon = 0.71f;
+			for (float z = 0; z < 365; z += 0.3f)
+			{
+				rotationTest2.z = z;
+				rotationCompressed.Set(rotationTest2);
+				retRot = rotationCompressed.Get();
+				float diff = abs(Wrap(retRot.z, 360.0f) - Wrap(rotationTest2.z, 360.0f));
+				if (diff > largest)
+					largest = diff;
+				if(diff>=epsilon)
+					std::cout << "Largest error was :" << largest << std::endl;
+				Assert::IsTrue(diff < epsilon);
+			}
+			std::cout<< "Largest error was :" << largest << std::endl;
+
+			moveCompressed.Set(mov);
+			auto retMov = moveCompressed.Get();
+			Assert::IsTrue(abs(movX - retMov.x) < epsilon);
+			Assert::IsTrue(abs(movX - retMov.x) < epsilon);
+			Assert::IsTrue(abs(movX - retMov.x) < epsilon);
+
+			//pp->Set(positionTest, rotationTest);
+			/*bool outValue1 = true;
+			bool outValue2 = false;
+			bool outValue3 = true;
+			bool outValue4 = true;
+			int outOffset = 0;
+			Serialize::Out(buffer, outOffset, outValue1, 1);
+			Assert::AreEqual(outOffset, 1);
+			Serialize::Out(buffer, outOffset, outValue2, 1);
+			Serialize::Out(buffer, outOffset, outValue3, 1);
+			Serialize::Out(buffer, outOffset, outValue4, 1);
+			Assert::AreEqual(outOffset, 4);
+			Assert::AreEqual(buffer[0], (U8)1);
+			Assert::AreEqual(buffer[1], (U8)0);
+			Assert::AreEqual(buffer[2], (U8)1);
+			Assert::AreEqual(buffer[3], (U8)1);
+
+			bool inValue[4];
+			int inOffset = 0;
+			Serialize::In(buffer, inOffset, inValue, 1);
+			Assert::AreEqual(inOffset, 4);
+			Assert::AreEqual(inValue[0], outValue1);
+			Assert::AreEqual(inValue[1], outValue2);
+			Assert::AreEqual(inValue[2], outValue3);
+			Assert::AreEqual(inValue[3], outValue4);*/
+		}
 	};
 
 	TEST_CLASS(UnitTestBasicNetworking_MovementPacketsAndArrays)
@@ -261,6 +353,33 @@ namespace UnitTestBasicNetworking
 			Assert::AreEqual((int)bp.gameInstanceId, (int)inPacket.gameInstanceId);
 		}
 
+		TEST_METHOD(BasicBasePacketTestPointer)
+		{
+			U8 buffer[100];
+
+			BasePacket* bp = new BasePacket();
+			bp->packetSubType = BasePacket::SubType::BasePacket_Hello;
+			bp->gameProductId = 13;
+			bp->versionNumberMajor = 56;
+			bp->versionNumberMinor = 11;
+			bp->gameInstanceId = 01;
+
+			IPacketSerializable* ptr = bp;
+			int outOffset = 0;
+			Serialize::Out(buffer, outOffset, *ptr, 1);
+
+			int inOffset = 0;
+			BasePacket inPacket;
+			Serialize::In(buffer, inOffset, inPacket, 1);
+
+			Assert::AreEqual(inOffset, outOffset);
+			Assert::AreEqual(bp->packetType, inPacket.packetType);
+			Assert::AreEqual(bp->packetSubType, inPacket.packetSubType);
+			Assert::AreEqual(bp->gameProductId, inPacket.gameProductId);
+			Assert::AreEqual(bp->versionNumberMajor, inPacket.versionNumberMajor);
+			Assert::AreEqual(bp->versionNumberMinor, inPacket.versionNumberMinor);
+			Assert::AreEqual((int)bp->gameInstanceId, (int)inPacket.gameInstanceId);
+		}
 		TEST_METHOD(BasicMovementPacketTest)
 		{
 		//todo: needs unit tests for set, get, and serializing the magnitude of movement
@@ -297,13 +416,14 @@ namespace UnitTestBasicNetworking
 
 			//float outx, outy, outz;
 			Vector3 resultPos, resultRot, resultMov;
+			float rotEpsilon = 0.71f;
 			inPacket.Get(resultPos, resultRot, resultMov);
 			Assert::IsTrue(abs(posX - resultPos.x) < episilon);
 			Assert::IsTrue(abs(posY - resultPos.y) < episilon);
 			Assert::IsTrue(abs(posZ - resultPos.z) < episilon);
-			Assert::IsTrue(abs(x - resultRot.x) < episilon);
-			Assert::IsTrue(abs(y - resultRot.y) < episilon);
-			Assert::IsTrue(abs(z - resultRot.z) < episilon);
+			Assert::IsTrue(abs(x - resultRot.x) < rotEpsilon);// abs(Wrap(retRot.z, 360.0f) - Wrap(rotationTest2.z, 360.0f));
+			Assert::IsTrue(abs(y - resultRot.y) < rotEpsilon);
+			Assert::IsTrue(abs(z - resultRot.z) < rotEpsilon);
 			Assert::IsTrue(abs(movX - resultMov.x) < episilon);
 			Assert::IsTrue(abs(movY - resultMov.y) < episilon);
 			Assert::IsTrue(abs(movZ - resultMov.z) < episilon);
@@ -372,15 +492,15 @@ namespace UnitTestBasicNetworking
 			Assert::AreEqual(pp->gameProductId, inPositionPacket.gameProductId);
 			Assert::AreEqual(pp->versionNumberMajor, inPositionPacket.versionNumberMajor);
 
-
+			float rotEpsilon = 0.36f;
 			Vector3 resultPos = inPositionPacket.positionCompressed.Get();
 			Assert::IsTrue(abs(posX - resultPos.x) < episilon);
 			Assert::IsTrue(abs(posY - resultPos.y) < episilon);
 			Assert::IsTrue(abs(posZ - resultPos.z) < episilon);
 			Vector3 result = inPositionPacket.rotationCompressed.Get();
-			Assert::IsTrue(abs(x - result.x) < episilon);
-			Assert::IsTrue(abs(y - result.y) < episilon);
-			Assert::IsTrue(abs(z - result.z) < episilon);
+			Assert::IsTrue(abs(x - result.x) < rotEpsilon);
+			Assert::IsTrue(abs(y - result.y) < rotEpsilon);
+			Assert::IsTrue(abs(z - result.z) < rotEpsilon);
 
 
 			Assert::AreEqual(mp->packetType, inMovementPacket.packetType);
@@ -392,11 +512,11 @@ namespace UnitTestBasicNetworking
 			Assert::IsTrue(abs(posY - resultPos.y) < episilon);
 			Assert::IsTrue(abs(posZ - resultPos.z) < episilon);
 			result = inMovementPacket.rotationCompressed.Get();
-			Assert::IsTrue(abs(x - result.x) < episilon);
-			Assert::IsTrue(abs(y - result.y) < episilon);
-			Vector3 dirResult = inMovementPacket.rotationCompressed.Get();
-			Assert::IsTrue(abs(x - result.x) < episilon);
-			Assert::IsTrue(abs(y - result.y) < episilon);
+			Assert::IsTrue(abs(x - result.x) < rotEpsilon);
+			Assert::IsTrue(abs(y - result.y) < rotEpsilon);
+			Vector3 dirResult = inMovementPacket.movementDirCompressed.Get();
+			Assert::IsTrue(abs(x - dirResult.x) < episilon);
+			Assert::IsTrue(abs(y - dirResult.y) < episilon);
 
 
 			delete bp, pp, mp;
@@ -432,6 +552,7 @@ namespace UnitTestBasicNetworking
 			Serialize::In(buffer, inOffset, inPacket, 1);
 
 			int index = 0;
+			float rotEpsilon = 0.36f;
 			for (auto in : inPacket)
 			{
 				Assert::AreEqual(inOffset, outOffset);
@@ -448,28 +569,22 @@ namespace UnitTestBasicNetworking
 				Assert::IsTrue(abs(posY - resultPos.y) < episilon);
 				Assert::IsTrue(abs(posZ - resultPos.z) < episilon);
 				Vector3 result = in.rotationCompressed.Get();
-				Assert::IsTrue(abs(x - result.x) < episilon);
-				Assert::IsTrue(abs(y - result.y) < episilon);
-				Assert::IsTrue(abs(z - result.z) < episilon);
+				Assert::IsTrue(abs(x - result.x) < rotEpsilon);
+				Assert::IsTrue(abs(y - result.y) < rotEpsilon);
+				Assert::IsTrue(abs(z - result.z) < rotEpsilon);
 				index++;
 			}
 		}
 	};
 
-
 	TEST_CLASS(UnitTestBasicNetworking_PacketFactory)
 	{
 		FactoryMock* mock;
-		TEST_METHOD(___InitFactory)
-		{
-			
-			//PacketMethodFactory::InitFactory();
-		}
 		
 		TEST_METHOD(FactoryTest_Basics)
 		{
 			mock = new FactoryMock();
-			unique_ptr<IPacketSerializable> pack = PacketMethodFactory::Create("BasePacket");
+			shared_ptr<IPacketSerializable> pack = PacketMethodFactory::Create("BasePacket");
 			pack.get()->GetName();
 
 			Assert::AreEqual((string)("BasePacket"), pack.get()->GetName());
@@ -478,29 +593,22 @@ namespace UnitTestBasicNetworking
 
 			PacketMethodFactory::Release(pack);
 			delete mock;
-
-			/*int outOffset = 0;
-			Serialize::Out(buffer, outOffset, bp, 1);
-
-			int inOffset = 0;
-			MovementPacket inPacket[numPackets];
-			Serialize::In(buffer, inOffset, inPacket, 1);*/
 		}
 		TEST_METHOD(FactoryTest_Basics2)
 		{
 			mock = new FactoryMock();
-			unique_ptr<IPacketSerializable> pack = PacketMethodFactory::Create("BasePacket");
+			shared_ptr<IPacketSerializable> pack = PacketMethodFactory::Create("BasePacket");
 
 			Assert::AreEqual((string)("BasePacket"), pack.get()->GetName());
 			Assert::AreEqual((U8)PacketType::PacketType_Base, pack.get()->GetType());
 			Assert::AreEqual((U8)BasePacket::BasePacket_Type, pack.get()->GetSubType());
 
-			unique_ptr<IPacketSerializable> pack3 = PacketMethodFactory::Create("PositionPacket");
+			shared_ptr<IPacketSerializable> pack3 = PacketMethodFactory::Create("PositionPacket");
 			Assert::AreEqual((string)("PositionPacket"), pack3.get()->GetName());
 			Assert::AreEqual((U8)PacketType::PacketType_ServerTick, pack3.get()->GetType());
 			Assert::AreEqual((U8)ServerTickPacket::ServerTick_Position, pack3.get()->GetSubType());
 
-			unique_ptr<IPacketSerializable> pack2 = PacketMethodFactory::Create("MovementPacket");
+			shared_ptr<IPacketSerializable> pack2 = PacketMethodFactory::Create("MovementPacket");
 			Assert::AreEqual((string)("MovementPacket"), pack2.get()->GetName());
 			Assert::AreEqual((U8)PacketType::PacketType_ServerTick, pack2.get()->GetType());
 			Assert::AreEqual((U8)ServerTickPacket::ServerTick_Movement, pack2.get()->GetSubType());
@@ -509,21 +617,144 @@ namespace UnitTestBasicNetworking
 			PacketMethodFactory::Release(pack2);
 			PacketMethodFactory::Release(pack);
 			delete mock;
-
-			/*int outOffset = 0;
-			Serialize::Out(buffer, outOffset, bp, 1);
-
-			int inOffset = 0;
-			MovementPacket inPacket[numPackets];
-			Serialize::In(buffer, inOffset, inPacket, 1);*/
 		}
-		TEST_METHOD(ZZ_TeardownFactory)
+		TEST_METHOD(FactoryTest_FactoryTest)
 		{
+			mock = new FactoryMock();
+			shared_ptr<IPacketSerializable> pack = PacketMethodFactory::Create("BasePacket");
+
+			Assert::AreEqual((string)("BasePacket"), pack.get()->GetName());
+			Assert::AreEqual((U8)PacketType::PacketType_Base, pack.get()->GetType());
+			Assert::AreEqual((U8)BasePacket::BasePacket_Type, pack.get()->GetSubType());
+
+			shared_ptr<IPacketSerializable> pack2 = PacketMethodFactory::Create("PositionPacket");
+			Assert::AreEqual((string)("PositionPacket"), pack2.get()->GetName());
+			Assert::AreEqual((U8)PacketType::PacketType_ServerTick, pack2.get()->GetType());
+			Assert::AreEqual((U8)ServerTickPacket::ServerTick_Position, pack2.get()->GetSubType());
+			PositionPacket* pp = dynamic_cast<PositionPacket*>(pack2.get());
+
+			float episilon = 0.001f;
 			
+			Vector3 positionTest(1, 20, -3);
+			Vector3 rotationTest(20, 17, -20);
+			pp->Set(positionTest, rotationTest);
+
+			shared_ptr<IPacketSerializable> pack3 = PacketMethodFactory::Create("MovementPacket");
+			Assert::AreEqual((string)("MovementPacket"), pack3.get()->GetName());
+			Assert::AreEqual((U8)PacketType::PacketType_ServerTick, pack3.get()->GetType());
+			Assert::AreEqual((U8)ServerTickPacket::ServerTick_Movement, pack3.get()->GetSubType());
+
+			U8 buffer[100];
+			int outOffset = 0;
+			Serialize::Out(buffer, outOffset, *pack, 1);
+			Serialize::Out(buffer, outOffset, *pack3.get(), 1);
+			Serialize::Out(buffer, outOffset, *pack2.get(), 1);
+
+			int inOffset = 0, sampleOffset = 0;
+			BasePacket sampler;
+			Serialize::In(buffer, sampleOffset, sampler, 1);
+			shared_ptr<IPacketSerializable> unpack1 = PacketMethodFactory::Create(sampler.packetType, sampler.packetSubType);
+			Serialize::In(buffer, inOffset, *unpack1, 1);
+			sampleOffset = inOffset;
+			Serialize::In(buffer, sampleOffset, sampler, 1);
+			shared_ptr<IPacketSerializable> unpack2 = PacketMethodFactory::Create(sampler.packetType, sampler.packetSubType);
+			Serialize::In(buffer, inOffset, *unpack2, 1);
+			sampleOffset = inOffset;
+			Serialize::In(buffer, sampleOffset, sampler, 1);
+			shared_ptr<IPacketSerializable> unpack3 = PacketMethodFactory::Create(sampler.packetType, sampler.packetSubType);
+			Serialize::In(buffer, inOffset, *unpack3, 1);
+			sampleOffset = inOffset;
+
+			Assert::AreEqual((string)("BasePacket"), unpack1.get()->GetName());
+			Assert::AreEqual((U8)PacketType::PacketType_Base, unpack1.get()->GetType());
+			Assert::AreEqual((U8)BasePacket::BasePacket_Type, unpack1.get()->GetSubType());
+			Assert::AreEqual((string)("MovementPacket"), unpack2.get()->GetName());
+			Assert::AreEqual((U8)PacketType::PacketType_ServerTick, unpack2.get()->GetType());
+			Assert::AreEqual((U8)ServerTickPacket::ServerTick_Movement, unpack2.get()->GetSubType());
+			Assert::AreEqual((string)("PositionPacket"), unpack3.get()->GetName());
+			Assert::AreEqual((U8)PacketType::PacketType_ServerTick, unpack3.get()->GetType());
+			Assert::AreEqual((U8)ServerTickPacket::ServerTick_Position, unpack3.get()->GetSubType());
+			PositionPacket* pp2 = dynamic_cast<PositionPacket*>(unpack3.get());
+
+			float rotEpsilon = 0.36f;
+			Vector3 resultPos, resultRot;// , resultMov;
+			pp2->Get(resultPos, resultRot);// , resultMov);
+			Assert::IsTrue(abs(positionTest.x - resultPos.x) < episilon);
+			Assert::IsTrue(abs(positionTest.y - resultPos.y) < episilon);
+			Assert::IsTrue(abs(positionTest.z - resultPos.z) < episilon);
+			Assert::IsTrue(AbsDiffWithWrap(rotationTest.x, resultRot.x, 360.0f) < rotEpsilon);
+			Assert::IsTrue(AbsDiffWithWrap(rotationTest.y, resultRot.y, 360.0f) < rotEpsilon);
+			Assert::IsTrue(AbsDiffWithWrap(rotationTest.z, resultRot.z, 360.0f) < rotEpsilon);
+			/*Assert::IsTrue(abs(movX - resultMov.x) < episilon);
+			Assert::IsTrue(abs(movY - resultMov.y) < episilon);
+			Assert::IsTrue(abs(movZ - resultMov.z) < episilon);*/
+			
+			PacketMethodFactory::Release(unpack1);
+			PacketMethodFactory::Release(unpack2);
+			PacketMethodFactory::Release(unpack3);
+			PacketMethodFactory::Release(pack3);
+			PacketMethodFactory::Release(pack2);
+			PacketMethodFactory::Release(pack);
+			delete mock;
 		}
 	};
+
 	TEST_CLASS(UnitTestBasicNetworking_PacketMemoryPools)
 	{
+		FactoryMock* mock;
+		TEST_METHOD(FactoryTest_Basics)
+		{
+			mock = new FactoryMock();
+			const int num = 100;
+			shared_ptr<IPacketSerializable> packets [num];
+			for (int i = 0; i < num; i++)
+			{
+				shared_ptr<IPacketSerializable> pack = PacketMethodFactory::Create("BasePacket");
+				BasePacket* unpacked = dynamic_cast<BasePacket*>(pack.get());
+				packets[i] = pack;
+				unpacked->gameInstanceId = i;
+			}
+			// verfiy that every instance is unique
+			std::set<int> instanceIds;
+			for (int i = 0; i < num; i++)
+			{
+				BasePacket* bp = dynamic_cast<BasePacket*>(packets[i].get());
+				Assert::IsTrue(instanceIds.find(bp->gameInstanceId) == instanceIds.end());
+				instanceIds.insert(bp->gameInstanceId);
+			}
+
+		/*	IPacketSerializable* packets2[num];
+			IPacketSerializable* packets3[num];
+			for (int i = 0; i < num; i++)
+			{
+				shared_ptr<IPacketSerializable> position = PacketMethodFactory::Create("PositionPacket");
+				shared_ptr<IPacketSerializable> movement = PacketMethodFactory::Create("MovementPacket");
+				PositionPacket* unpackedPosition = dynamic_cast<PositionPacket*>(position.get());
+				MovementPacket* unpackedMove = dynamic_cast<MovementPacket*>(movement.get());
+				packets2[i] = unpackedPosition;
+				unpackedPosition->gameInstanceId = i+200;
+				packets3[i] = unpackedMove;
+				unpackedMove->gameInstanceId = i+400;
+			}
+			for (int i = 0; i < num; i++)
+			{
+				PositionPacket* bp = dynamic_cast<PositionPacket*>(packets2[i]);
+				Assert::IsTrue(instanceIds.find(bp->gameInstanceId) == instanceIds.end());
+				instanceIds.insert(bp->gameInstanceId);
+				MovementPacket* bp2 = dynamic_cast<MovementPacket*>(packets3[i]);
+				Assert::IsTrue(instanceIds.find(bp2->gameInstanceId) == instanceIds.end());
+				instanceIds.insert(bp2->gameInstanceId);
+			}*/
+			/*shared_ptr<IPacketSerializable> pack = PacketMethodFactory::Create("BasePacket");
+			pack.get()->GetName();
+
+			Assert::AreEqual((string)("BasePacket"), pack.get()->GetName());
+			Assert::AreEqual((U8)PacketType::PacketType_Base, pack.get()->GetType());
+			Assert::AreEqual((U8)BasePacket::BasePacket_Type, pack.get()->GetSubType());
+
+			PacketMethodFactory::Release(pack);*/
+			delete mock;
+		}
 	};
 	TEST_CLASS(UnitTestBasicNetworking_PacketWrappers)
 	{

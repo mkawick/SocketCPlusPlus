@@ -50,8 +50,12 @@ enum PacketType
 ///////////////////////////////////////////////////////////////
 ///////////////////////////////////////////////////////////////
 
-class IPacketSerializable : public IBinarySerializable
+class IPacketSerializable //: public IBinarySerializable
 {
+public:
+    virtual bool  SerializeIn(const U8* data, int& bufferOffset, int minorVersion) = 0;
+    virtual bool  SerializeOut(U8* data, int& bufferOffset, int minorVersion = NetworkVersionMinor) const = 0;
+
 public:
     virtual string GetName() = 0;
     virtual U8 GetType() = 0;
@@ -113,7 +117,7 @@ public: // factory interface
     U8 GetType()        override { return Type(); }
     U8 GetSubType()     override { return SubType(); }
 
-    static unique_ptr<IPacketSerializable> CreateMethod();
+    static shared_ptr<IPacketSerializable> CreateMethod();
 
     static string GetFactoryName() { return from_type<BasePacket>(); }
     static U8 Type() { return PacketType_Base; }
@@ -132,7 +136,7 @@ public:
 
     bool  SerializeIn(const U8* data, int& bufferOffset, int minorVersion);
     bool  SerializeOut(U8* data, int& bufferOffset, int minorVersion) const;
-    IBinarySerializable* packet;
+    IPacketSerializable* packet;
 };
 
 ///////////////////////////////////////////////////////////////

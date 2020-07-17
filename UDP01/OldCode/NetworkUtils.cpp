@@ -41,10 +41,10 @@
 #include <stdlib.h>
 #include "DataTypes.h"
 #include "Packets/Serialize.h"
-#include "Utils/Utils.h"
+//#include "Utils/Utils.h"
 using namespace std;
 
-#include "./Logging/server_log.h"
+#include "./NetworkCommon/server_log.h"
 
 // prototypes
 

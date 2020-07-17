@@ -12,7 +12,7 @@ using namespace std;
 
 map<string, PacketMethodFactory::TCreateMethod> PacketMethodFactory::s_methods;
 map<pair<U8, U8>, PacketMethodFactory::TCreateMethod> PacketMethodFactory::s_allocationMethods;
-map<pair<U8, U8>, circular_buffer<unique_ptr <IPacketSerializable>>* > PacketMethodFactory::s_creationPool;
+map<pair<U8, U8>, circular_buffer<shared_ptr <IPacketSerializable>>* > PacketMethodFactory::s_creationPool;
 
 ////////////////////////////////////////////////////////////////////////
 
@@ -26,7 +26,7 @@ void PacketMethodFactory::InitFactory()
 
         int numToCreate = 100;
 
-        auto buff = new circular_buffer< unique_ptr <IPacketSerializable>>(numToCreate);
+        auto buff = new circular_buffer< shared_ptr <IPacketSerializable>>(numToCreate);
 
         for (int i = 0; i < numToCreate; i++)
         {
@@ -76,7 +76,7 @@ bool PacketMethodFactory::Register(const string& name, U8 type, U8 subType, TCre
 ////////////////////////////////////////////////////////////////////////
 
 
-bool PacketMethodFactory::Release(unique_ptr <IPacketSerializable>& data)
+bool PacketMethodFactory::Release(shared_ptr <IPacketSerializable>& data)
 {
     U8 type = data.get()->GetType();
     U8 subType = data.get()->GetSubType();
@@ -89,7 +89,7 @@ bool PacketMethodFactory::Release(unique_ptr <IPacketSerializable>& data)
     return false;
 }
 ////////////////////////////////////////////////////////////////////////
-unique_ptr<IPacketSerializable>
+shared_ptr<IPacketSerializable>
 PacketMethodFactory::Create(const string& name)
 {
     if (auto it = s_methods.find(name); it != s_methods.end())
@@ -104,7 +104,7 @@ PacketMethodFactory::Create(const string& name)
 }
 ////////////////////////////////////////////////////////////////////////
 
-unique_ptr <IPacketSerializable>
+shared_ptr <IPacketSerializable>
 PacketMethodFactory::Create(U8 type, U8 subType)
 {
     if (auto it = s_creationPool.find(pair<U8, U8>(type, subType)); it != s_creationPool.end())
@@ -117,7 +117,7 @@ PacketMethodFactory::Create(U8 type, U8 subType)
 }
 ////////////////////////////////////////////////////////////////////////
 
-unique_ptr <IPacketSerializable>
+shared_ptr <IPacketSerializable>
 PacketMethodFactory::Allocate(U8 type, U8 subType)
 {
     if (auto it = s_allocationMethods.find(pair<U8, U8>(type, subType)); it != s_allocationMethods.end())

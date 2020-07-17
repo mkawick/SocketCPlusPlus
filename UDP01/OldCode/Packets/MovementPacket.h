@@ -22,7 +22,7 @@ struct Vector3
 
 ///////////////////////////////////////////////////////////////
 
-class RotationCompressed : public IBinarySerializable// using 360 degrees as an integer
+class RotationCompressed // : public IBinarySerializable// using 360 degrees as an integer
 {
 public:
     int rotation;
@@ -50,7 +50,7 @@ private:
 
 ///////////////////////////////////////////////////////////////
 
-class PositionCompressed : public IBinarySerializable
+class PositionCompressed //: public IBinarySerializable
 {
 public:
     U64 position = 0;
@@ -127,7 +127,7 @@ public: // factory interface
     U8 GetType()        override { return Type(); }
     U8 GetSubType()     override { return SubType(); }
 
-    static unique_ptr<IPacketSerializable> CreateMethod();
+    static shared_ptr<IPacketSerializable> CreateMethod();
 
     static string GetFactoryName() { return from_type<PositionPacket>(); }
     static U8 Type() { return PacketType_ServerTick; }
@@ -146,7 +146,7 @@ public:
     void    Set(const Vector3& position, const Vector3& direction, const Vector3& movementDir);
     void    Get(Vector3& position, Vector3& direction, Vector3& movementDir);
 
-    RotationCompressed  movementDirCompressed;
+    PositionCompressed  movementDirCompressed;
     //FloatCompressed     movementMagnitudeCompressed;
 
  //--------------------------------------------------
@@ -157,7 +157,7 @@ public: // factory interface
     U8 GetType()        override { return Type(); }
     U8 GetSubType()     override { return SubType(); }
 
-    static unique_ptr<IPacketSerializable> CreateMethod();
+    static shared_ptr<IPacketSerializable> CreateMethod();
 
     static string GetFactoryName() { return from_type<MovementPacket>(); }
     static U8 Type() { return PacketType_ServerTick; }

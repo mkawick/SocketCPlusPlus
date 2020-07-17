@@ -139,7 +139,7 @@ BasePacket::BasePacket(int packet_type, int packet_sub_type) :
     static_assert(GetSize() == predictedSize, "error");// this is meant to enforce maintenence as these values change
 }
 
-unique_ptr<IPacketSerializable>  BasePacket::CreateMethod()
+shared_ptr<IPacketSerializable>  BasePacket::CreateMethod()
 {
     return make_unique<BasePacket>();
 }

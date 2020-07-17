@@ -21,7 +21,7 @@ bool    ServerTickPacket::SerializeOut(U8* data, int& bufferOffset, int minorVer
 
 ///////////////////////////////////////////////////////////////
 
-unique_ptr<IPacketSerializable>  PositionPacket::CreateMethod()
+shared_ptr<IPacketSerializable>  PositionPacket::CreateMethod()
 {
     return make_unique<PositionPacket>();
 }
@@ -98,7 +98,7 @@ void    MovementPacket::Get(Vector3& position, Vector3& direction, Vector3& move
     //movementDir = movementDirCompressed;
 }
 
-unique_ptr<IPacketSerializable>  MovementPacket::CreateMethod()
+shared_ptr<IPacketSerializable>  MovementPacket::CreateMethod()
 {
     return make_unique<MovementPacket>();
 }

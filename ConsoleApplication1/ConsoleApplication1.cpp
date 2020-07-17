@@ -1,7 +1,10 @@
 // ConsoleApplication1.cpp : This file contains the 'main' function. Program execution begins and ends there.
 //
 
+#include <boost/array.hpp>
+#include <boost/circular_buffer.hpp>
 #include <iostream>
+#include <set>
 #include <type_traits>
 #include <map>
 #include "../UDP01/OldCode/General/CircularBuffer.h"
@@ -18,6 +21,7 @@ public:
     virtual ~ICompressionMethod() = default;
 
     virtual void Compress() = 0;
+    virtual ICompressionMethod* Clone() = 0;
 
 public: // all part of the factory interface
 
@@ -31,7 +35,7 @@ public: // all part of the factory interface
 class PacketMethodFactory
 {
 public:
-    using TCreateMethod = unique_ptr<ICompressionMethod>(*)();
+    using TCreateMethod = shared_ptr<ICompressionMethod>(*)();
 
 public:
     PacketMethodFactory() = delete;
@@ -39,19 +43,19 @@ public:
     static void Init();
     static void Shutdown();
 
-    static unique_ptr<ICompressionMethod> Create(const string& name);
-    static unique_ptr <ICompressionMethod> Create(U8 type, U8 subType);
+    static shared_ptr<ICompressionMethod> Create(const string& name);
+    static shared_ptr<ICompressionMethod> Create(U8 type, U8 subType);
 
     //---------------------------------------------------------------
-    static bool Release(unique_ptr <ICompressionMethod>& data);
+    static bool Release(shared_ptr <ICompressionMethod>& data);
 
 
 private:
     static map<string, TCreateMethod> s_methods;
     static map<pair<U8, U8>, TCreateMethod> s_allocationMethods;
-    static map<pair<U8, U8>, circular_buffer<unique_ptr <ICompressionMethod>>* > s_creationPool;
+    static map<pair<U8, U8>, circular_buffer<shared_ptr <ICompressionMethod>>* > s_creationPool;
 
-    static unique_ptr <ICompressionMethod> Allocate(U8 type, U8 subType);
+    static shared_ptr <ICompressionMethod> Allocate(U8 type, U8 subType);
 
 public:
     static bool Register(const string& name, U8 type, U8 subType, TCreateMethod funcCreate);
@@ -61,7 +65,7 @@ public:
 
 map<string, PacketMethodFactory::TCreateMethod> PacketMethodFactory::s_methods;
 map<pair<U8, U8>, PacketMethodFactory::TCreateMethod> PacketMethodFactory::s_allocationMethods;
-map<pair<U8, U8>, circular_buffer<unique_ptr <ICompressionMethod>>* > PacketMethodFactory::s_creationPool;
+map<pair<U8, U8>, circular_buffer<shared_ptr <ICompressionMethod>>* > PacketMethodFactory::s_creationPool;
 
 ////////////////////////////////////////////////////////////////////////
 
@@ -72,7 +76,7 @@ void PacketMethodFactory::Init()
         auto typePair = it->first;
         int numToCreate = 100;
 
-        auto buff = new circular_buffer< unique_ptr <ICompressionMethod>>(numToCreate);
+        auto buff = new circular_buffer< shared_ptr <ICompressionMethod>>(numToCreate);
 
         for (int i = 0; i < numToCreate; i++)
         {
@@ -110,7 +114,7 @@ bool PacketMethodFactory::Register(const string& name, U8 type, U8 subType, TCre
 
 ////////////////////////////////////////////////////////////////////////
 
-unique_ptr<ICompressionMethod>
+shared_ptr<ICompressionMethod>
 PacketMethodFactory::Create(const string& name)
 {
     if (auto it = s_methods.find(name); it != s_methods.end())
@@ -126,7 +130,7 @@ PacketMethodFactory::Create(const string& name)
 }
 ////////////////////////////////////////////////////////////////////////
 
-unique_ptr <ICompressionMethod>
+shared_ptr <ICompressionMethod>
 PacketMethodFactory::Create(U8 type, U8 subType)
 {
     if (auto it = s_creationPool.find(pair<U8, U8>(type, subType)); it != s_creationPool.end())
@@ -139,7 +143,7 @@ PacketMethodFactory::Create(U8 type, U8 subType)
 }
 ////////////////////////////////////////////////////////////////////////
 
-unique_ptr <ICompressionMethod>
+shared_ptr <ICompressionMethod>
 PacketMethodFactory::Allocate(U8 type, U8 subType)
 {
     if (auto it = s_allocationMethods.find(pair<U8, U8>(type, subType)); it != s_allocationMethods.end())
@@ -150,7 +154,7 @@ PacketMethodFactory::Allocate(U8 type, U8 subType)
     return nullptr;
 }
 
-bool PacketMethodFactory::Release(unique_ptr <ICompressionMethod>& data)
+bool PacketMethodFactory::Release(shared_ptr <ICompressionMethod>& data)
 {
     U8 type = data.get()->GetType();
     U8 subType = data.get()->GetSubType();
@@ -168,17 +172,21 @@ bool PacketMethodFactory::Release(unique_ptr <ICompressionMethod>& data)
 class ZipCompression : public ICompressionMethod
 {
 public:
+    ZipCompression() : gameInstanceId(0) {}
     virtual void Compress() override
     {
         cout << "Zip" << endl;
     }
+    ICompressionMethod* Clone() override { return this; }
+
+    int gameInstanceId;
 
 private:  // <Boilerplate that every class will need to implement> //
     string GetName() override { return GetFactoryName(); }
     U8 GetType() override { return Type(); }
     U8 GetSubType() override { return SubType(); }
 
-    static unique_ptr<ICompressionMethod> CreateMethod() {
+    static shared_ptr<ICompressionMethod> CreateMethod() {
         return make_unique<ZipCompression>();
     }
     static string GetFactoryName() { return "ZIP"; }
@@ -197,6 +205,9 @@ bool ZipCompression::s_typeRegistered = PacketMethodFactory::Register(ZipCompres
 
 int main()
 {
+   // boost::circular_buffer <int> circle(100);
+   // circle.
+
     string ret = "class BasePacket";
     string search("class ");
     size_t position = ret.find(search, 0);
@@ -210,9 +221,37 @@ int main()
 
     auto method2 = PacketMethodFactory::Create(0, 1);
     method2.get()->Compress();
-
     PacketMethodFactory::Release(method);
     PacketMethodFactory::Release(method2);
+
+    const int num = 100;
+    shared_ptr<ICompressionMethod> packets[num];
+    for (int i = 0; i < num; i++)
+    {
+        shared_ptr<ICompressionMethod> pack = PacketMethodFactory::Create("ZIP");
+        auto zc = dynamic_cast<ZipCompression*>(pack->Clone());
+        zc->gameInstanceId = i;
+        
+        packets[i] = pack;
+    }
+    // verfiy that every instance is unique
+    std::set<int> instanceIds;
+    for (int i = 0; i < num; i++)
+    {
+        //weak_ptr<ZipCompression> weak = packets[i];
+        //*if (auto tmp = packets[i].lock())
+        {
+            auto zc = dynamic_cast<ZipCompression*>(packets[i]->Clone());
+            if (instanceIds.find(zc->gameInstanceId) != instanceIds.end())
+                cout << "Duplicate" << endl;
+            instanceIds.insert(zc->gameInstanceId);
+        }
+    }
+    for (int i = 0; i < num; i++)
+    {
+        PacketMethodFactory::Release(packets[i]);
+    }
+    
 
     PacketMethodFactory::Shutdown();
     std::cout << "Hello World!\n";

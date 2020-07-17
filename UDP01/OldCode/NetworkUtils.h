@@ -1,6 +1,7 @@
 // NetworkUtils.h
 
 #pragma once
+#include <assert.h>
 
 namespace Network
 {
@@ -13,26 +14,35 @@ namespace Network
 
     namespace Utils
     {
+        template <typename T>
+        T Wrap(T value, T range)
+        {
+            value %= range;
+            if (value < 0)
+                value += range;
+            return value;
+        }
+
         static bool IsPowerOfTwo(int x)
         {
             return (x & (x - 1)) == 0;
         }
         static float ConvertToDeg(int value, int range)
         {
+            const float degreesInCircle = 360;
             float angle = (float)value / (float)range;
-            return angle * 512;
+            return angle * degreesInCircle;
         }
+        
         static int ConvertRange(float value, int range)
         {
             int repAngle = (int)(value * range);
-            repAngle %= range;
-            if (repAngle < 0)
-                repAngle += range;
-            return repAngle;
+            return Wrap(repAngle, range);
         }
         static int ConvertDegToQuantitized(float value, int quantitization)
         {
-            float deg = value / 512;
+            const float degreesInCircle = 360;
+            float deg = value / degreesInCircle;
 
             int repAngle = ConvertRange(deg, quantitization);
             return repAngle;
@@ -46,19 +56,19 @@ namespace Network
             }
             return -1;
         }
+        
     }
     namespace Settings
     {
         namespace Rotation
         {
-            const int quantizationX = 512;
-            const int quantizationY = 512;
-            const int quantizationZ = 512;
+            const int quantizationX = 1024;
+            const int quantizationY = 1024;
+            const int quantizationZ = 1024;
 
             const int shiftX = Network::Utils::GetBitPosition(quantizationY);
             const int shiftY = Network::Utils::GetBitPosition(quantizationZ);
             const int maskZ = quantizationZ - 1, maskY = quantizationY - 1, maskX = quantizationX - 1;
-
         };
         namespace Float
         {
