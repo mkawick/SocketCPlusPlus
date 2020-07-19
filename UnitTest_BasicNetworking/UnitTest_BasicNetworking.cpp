@@ -11,6 +11,7 @@
 #include "../UDP01/OldCode/Packets/MovementPacket.h"
 #include "../UDP01/OldCode/Packets/PacketFactory.h"
 #include "../UDP01/OldCode/Packets/MovementPacket.h"
+#include "../UDP01/OldCode/Socket/Socket.h"
 
 using namespace Microsoft::VisualStudio::CppUnitTestFramework;
 
@@ -291,34 +292,9 @@ namespace UnitTestBasicNetworking
 			Assert::IsTrue(abs(movX - retMov.x) < epsilon);
 			Assert::IsTrue(abs(movX - retMov.x) < epsilon);
 			Assert::IsTrue(abs(movX - retMov.x) < epsilon);
-
-			//pp->Set(positionTest, rotationTest);
-			/*bool outValue1 = true;
-			bool outValue2 = false;
-			bool outValue3 = true;
-			bool outValue4 = true;
-			int outOffset = 0;
-			Serialize::Out(buffer, outOffset, outValue1, 1);
-			Assert::AreEqual(outOffset, 1);
-			Serialize::Out(buffer, outOffset, outValue2, 1);
-			Serialize::Out(buffer, outOffset, outValue3, 1);
-			Serialize::Out(buffer, outOffset, outValue4, 1);
-			Assert::AreEqual(outOffset, 4);
-			Assert::AreEqual(buffer[0], (U8)1);
-			Assert::AreEqual(buffer[1], (U8)0);
-			Assert::AreEqual(buffer[2], (U8)1);
-			Assert::AreEqual(buffer[3], (U8)1);
-
-			bool inValue[4];
-			int inOffset = 0;
-			Serialize::In(buffer, inOffset, inValue, 1);
-			Assert::AreEqual(inOffset, 4);
-			Assert::AreEqual(inValue[0], outValue1);
-			Assert::AreEqual(inValue[1], outValue2);
-			Assert::AreEqual(inValue[2], outValue3);
-			Assert::AreEqual(inValue[3], outValue4);*/
 		}
 	};
+
 	TEST_CLASS(UnitTestBasicNetworking_BoilerplateRewrite)
 	{
 		TEST_METHOD(BasicBasePacketTest)
@@ -918,14 +894,118 @@ namespace UnitTestBasicNetworking
 
 			delete mock;
 		}
-	};
-	
+	};	
 
 	TEST_CLASS(UnitTestBasicNetworking_StreamOfPackets)
 	{
+		FactoryMock* mock;
+		TEST_METHOD(FactoryTest_Deserialize_1WrappedPacket)
+		{
+			mock = new FactoryMock();
+			const int num = 100;
+
+			shared_ptr<IPacketSerializable> pack = PacketMethodFactory::Create("BasePacket");
+			BasePacket* bp = dynamic_cast<BasePacket*>(pack->GetTypePtr());
+			bp->gameInstanceId = 13;
+			bp->gameProductId = 51;
+
+			SizePacket sp(pack);
+
+			U8 buffer[100];
+
+			int outOffset = 0;
+			Serialize::Out(buffer, outOffset, sp, 1);
+
+			int inOffset = 0;
+			SizePacket sp2;
+			if(sp2.IsRemainingBufferBigenough(buffer, inOffset, 1, num))
+				Serialize::In(buffer, inOffset, sp2, 1);
+			BasePacket* bp2 = dynamic_cast<BasePacket*>(sp2.packet->GetTypePtr()); 
+
+			Assert::AreEqual(inOffset, outOffset);
+			Assert::AreEqual(bp->packetType, bp2->packetType);
+			Assert::AreEqual(bp->packetSubType, bp2->packetSubType);
+			Assert::AreEqual(bp->gameProductId, bp2->gameProductId);
+			Assert::AreEqual(bp->versionNumberMajor, bp2->versionNumberMajor);
+			Assert::AreEqual(bp->versionNumberMinor, bp2->versionNumberMinor);
+			Assert::AreEqual((int)bp->gameInstanceId, (int)bp2->gameInstanceId);
+
+			delete mock;
+		}
+		TEST_METHOD(FactoryTest_Deserialize_WrappedPackets)
+		{
+			mock = new FactoryMock();
+			const int num = 100;
+
+			const int numToSend = 5;
+			SizePacket sp[numToSend];
+			shared_ptr<IPacketSerializable> pack[numToSend];
+			int packetType[numToSend][2] = {
+				{PacketType_Base, ServerTickPacket::BasePacket_Type},
+				{PacketType_Base, ServerTickPacket::BasePacket_Type},
+				{PacketType_ServerTick, ServerTickPacket::ServerTick_Position},
+				{PacketType_ServerTick, ServerTickPacket::ServerTick_Movement},
+				{PacketType_ServerTick, ServerTickPacket::ServerTick_Position}
+			};
+			
+			for (int i = 0; i < numToSend; i++)
+			{
+				pack[i] = PacketMethodFactory::Create(packetType[i][0], packetType[i][1]);
+				BasePacket* bp = dynamic_cast<BasePacket*>(pack[i]->GetTypePtr());
+				bp->gameInstanceId = 13;
+				bp->gameProductId = 51;
+				sp[i].packet = pack[i];
+			}
+
+			U8 buffer[120];
+
+			int outOffset = 0;
+			Serialize::Out(buffer, outOffset, sp, 1);
+
+			int inOffset = 0;
+			int index = 0;
+			SizePacket sp2;
+			while (sp2.IsRemainingBufferBigenough(buffer, inOffset, 1, num) )
+			{
+				Serialize::In(buffer, inOffset, sp2, 1);
+				BasePacket* bp2 = dynamic_cast<BasePacket*>(sp2.packet->GetTypePtr());
+				BasePacket* bp = dynamic_cast<BasePacket*>(pack[index]->GetTypePtr());
+				
+				Assert::AreEqual(bp->packetType, bp2->packetType);
+				Assert::AreEqual(bp->packetSubType, bp2->packetSubType);
+				Assert::AreEqual(bp->gameProductId, bp2->gameProductId);
+				Assert::AreEqual(bp->versionNumberMajor, bp2->versionNumberMajor);
+				Assert::AreEqual(bp->versionNumberMinor, bp2->versionNumberMinor);
+				Assert::AreEqual((int)bp->gameInstanceId, (int)bp2->gameInstanceId);
+
+				
+				PacketMethodFactory::Release(sp2.packet);
+				sp2.packet.reset();
+				index++;
+			}
+			Assert::AreEqual(inOffset, outOffset);
+			for (int i = 0; i < numToSend; i++)
+			{
+				PacketMethodFactory::Release(pack[i]);
+				pack[i].reset();
+			}
+
+			delete mock;
+		}
 	};
 
-	TEST_CLASS(UnitTestBasicNetworking_UDPSocket)
+	TEST_CLASS(UnitTestBasicNetworking_TCpSocket)
 	{
+		//  launching a basic server
+		TEST_METHOD(SocketTest_CreateServer)
+		{
+			// create started
+			// listens
+			// shuts down
+		}
+
+		// launching a basic client
+
+		// client and server talk.
 	};
 }

@@ -146,34 +146,23 @@ public: // factory interface
     static constexpr int   GetSize();
 
     FactoryBoilerplate(BasePacket, PacketType_Base, BasePacket_Type);
-    /*
-    string GetName()    override { return GetFactoryName(); }
-    U8 GetType()        override { return Type(); }
-    U8 GetSubType()     override { return SubType(); }
-    static shared_ptr<IPacketSerializable>  CreateMethod()
-    {
-        return make_unique<BasePacket>();
-    }
-    IPacketSerializable* GetTypePtr() override { return this; }
-    static string GetFactoryName() { return from_type<BasePacket>(); }
-    static U8 Type() { return PacketType_Base; }
-    static U8 SubType() { return BasePacket_Type; }
-    */
-
-    
 };
 
 ///////////////////////////////////////////////////////////////
 ///////////////////////////////////////////////////////////////
 
-class SizePacket : public IPacketSerializable
+class SizePacket // : public IPacketSerializable
 {
 public:
+    SizePacket() {}
+    SizePacket(shared_ptr<IPacketSerializable>& p): packet(p) {}
+
     //PacketType_NetworkProtocol
 
+    bool  IsRemainingBufferBigenough(const U8* data, int& bufferOffset, int minorVersion, int totalBytesInBuffer);
     bool  SerializeIn(const U8* data, int& bufferOffset, int minorVersion);
     bool  SerializeOut(U8* data, int& bufferOffset, int minorVersion) const;
-    IPacketSerializable* packet;
+    shared_ptr<IPacketSerializable> packet;
 };
 
 ///////////////////////////////////////////////////////////////

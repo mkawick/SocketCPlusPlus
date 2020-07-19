@@ -180,15 +180,29 @@ bool  BasePacket::SerializeOut(U8* data, int& bufferOffset, int minorVersion) co
 
 ///////////////////////////////////////////////////////////////
 
+bool  SizePacket::IsRemainingBufferBigenough(const U8* data, int& bufferOffset, int minorVersion, int totalBytesInBuffer)
+{
+    U8 type;
+    int probeOffset = bufferOffset + sizeof(type);
+    U16 size;
+    Serialize::In(data, probeOffset, size, minorVersion);
+    if (size + probeOffset > totalBytesInBuffer)
+        return false;
+    return true;
+}
 bool  SizePacket::SerializeIn(const U8* data, int& bufferOffset, int minorVersion)
 {
     U8 type;
     Serialize::In(data, bufferOffset, type, minorVersion);
     U16 size;
-    Serialize::In(data, bufferOffset, size, minorVersion);
-    // needs the factory in place to deserialize the next packet
-    BasePacket* ptr = new BasePacket();
-    ptr->SerializeIn(data, bufferOffset, minorVersion);
+    Serialize::In(data, bufferOffset, size, minorVersion);// size is here for validation... we need to use this for predicting the next length
+
+    int probeOffset = bufferOffset;
+    BasePacket probe;
+    probe.SerializeIn(data, probeOffset, minorVersion);
+
+    packet = PacketMethodFactory::Create(probe.packetType, probe.packetSubType);
+    packet->SerializeIn(data, bufferOffset, minorVersion);
     
     return true;
 }
@@ -196,9 +210,10 @@ bool  SizePacket::SerializeOut(U8* data, int& bufferOffset, int minorVersion) co
 {
     Serialize::Out(data, bufferOffset, (U8)PacketType_NetworkProtocol, minorVersion);
     int pos = bufferOffset;
-    bufferOffset += sizeof(U16);
+    U16 placeholderSize = sizeof(U16);
+    bufferOffset += placeholderSize;
     packet->SerializeOut(data, bufferOffset, minorVersion);
-    U16 size = bufferOffset - pos;
+    U16 size = bufferOffset - pos - placeholderSize;
     Serialize::Out(data, pos, size, minorVersion);
 
     return true;
