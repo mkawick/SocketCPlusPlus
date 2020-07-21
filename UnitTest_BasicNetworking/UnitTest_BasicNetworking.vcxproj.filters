@@ -36,6 +36,15 @@
     <ClCompile Include="pch.cpp">
       <Filter>Defaults</Filter>
     </ClCompile>
+    <ClCompile Include="..\UDP01\OldCode\NetworkUtils.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\UDP01\OldCode\NetworkCommon\server_log.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\UDP01\OldCode\Utils\Utils.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="pch.h">

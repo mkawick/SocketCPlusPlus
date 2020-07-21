@@ -7,6 +7,8 @@
 #include <stdio.h>
 
 #include "Platform.h"
+#include "DataTypes.h"
+#include "NetworkUtils.h"
 
 #if PLATFORM == PLATFORM_WINDOWS
    #if _MSC_VER < 1500

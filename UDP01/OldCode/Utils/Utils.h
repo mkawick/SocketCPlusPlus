@@ -18,7 +18,7 @@ std::string    GetDateInUTC( time_t t );
 U64            GetDateFromString( const char* UTCFormatted );
 int            GetDiffTimeFromRightNow( const char* UTCFormatted );// negative times are in the past
 std::string    CreatePrintablePair( const std::string& key, const std::string& value );
-U32            GetCurrentMilliseconds();
+U64            GetCurrentMilliseconds();
 
 bool           HasTimeWindowExpired( const time_t& currentTime, const time_t& windowBegin, int numSecondsForWindow );
 bool           InCurrentTimeWindow( const time_t& currentTime, const time_t& windowBegin, int numSecondsForWindow );

@@ -11,16 +11,21 @@
 //
 
 #include "../UDP01/OldCode/Socket/socket.h"
-
+#include <conio.h>
 
 int main()
 {
     try
     {
-        io_context io_context;
+        TCPThreader thread;
+        thread.Test();
+
+        _getch();
+
+       /* io_context io_context;
         TCPServer server1(io_context);
         UDPServer server2(io_context);
-        io_context.run();
+        io_context.run();*/
     }
     catch (std::exception& e)
     {

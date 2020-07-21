@@ -166,9 +166,12 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="..\UDP01\OldCode\NetworkCommon\server_log.cpp" />
+    <ClCompile Include="..\UDP01\OldCode\NetworkUtils.cpp" />
     <ClCompile Include="..\UDP01\OldCode\Packets\BasePacket.cpp" />
     <ClCompile Include="..\UDP01\OldCode\Packets\MovementPacket.cpp" />
     <ClCompile Include="..\UDP01\OldCode\Packets\PacketFactory.cpp" />
+    <ClCompile Include="..\UDP01\OldCode\Utils\Utils.cpp" />
     <ClCompile Include="pch.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Create</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Create</PrecompiledHeader>

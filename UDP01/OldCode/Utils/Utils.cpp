@@ -10,6 +10,8 @@
 #include <ctime>
 #include <time.h>
 #include <errno.h>
+#include <boost/date_time/posix_time/posix_time.hpp>
+#include <boost/chrono.hpp>
 
 #if PLATFORM == PLATFORM_WINDOWS
    //#include <windows.h>
@@ -180,10 +182,15 @@ std::string    CreatePrintablePair( const std::string& key, const std::string& v
 
 //////////////////////////////////////////////////////////////////////////
 
-U32            GetCurrentMilliseconds()
+U64            GetCurrentMilliseconds()
 {
 #if PLATFORM == PLATFORM_WINDOWS
-   return timeGetTime();
+
+    U64 milliseconds_since_epoch =
+        std::chrono::system_clock::now().time_since_epoch() /
+        std::chrono::milliseconds(1);
+    return milliseconds_since_epoch;
+   //return timeGetTime();
 #else
    struct timeval now;
    int rv = gettimeofday( &now, 0 );
@@ -312,7 +319,7 @@ const string OpenAndLoadFile( const string& path )
    if( file.is_open() )
    {
       ifstream::pos_type  size = file.tellg();
-      int num = size;
+      int num = (int)size;
       char* memblock = new char [num+1];
       memblock[num] = 0;
       file.seekg (0, ios::beg);

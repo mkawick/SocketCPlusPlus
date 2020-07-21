@@ -994,13 +994,46 @@ namespace UnitTestBasicNetworking
 		}
 	};
 
-	TEST_CLASS(UnitTestBasicNetworking_TCpSocket)
+	TEST_CLASS(UnitTestBasicNetworking_TcpSocket)
 	{
 		//  launching a basic server
-		TEST_METHOD(SocketTest_CreateServer)
+		TEST_METHOD(SocketTest_CreateTCPServer)
 		{
 			// create started
+			try
+			{
+				/*io_context io_context;
+				TCPServer server1(io_context);
+				//UDPServer server2(io_context);
+				io_context.run();*/
+
+				TCPThreader* threader = new TCPThreader(1313);
+				threader->BeginService();
+
+				Assert::IsTrue(threader->IsConnected());
+				Assert::AreEqual((int)threader->GetPortAddr(), 1313);
+
+				Sleep(10);
+				/*char ipBuffer[32];
+				Network::GetLocalIpAddress(ipBuffer, 32);
+				string localIpAddress(ipBuffer);
+				std::string ll = boost::asio::ip::host_name() + ".local";
+				string localIpAddress2 = getLocalIPAddress().to_string();*/
+
+				string threaderIpAddress(threader->GetSocketAddr().to_string());
+				Assert::AreEqual("0.0.0.0", threaderIpAddress.c_str()); // should listen on all available ipAddresses
+				
+				threader->Stop();
+				Sleep(50);
+				delete threader;
+			}
+			catch (std::exception& e)
+			{
+				string errorText(e.what());
+				std::cerr << errorText << std::endl;
+			}
 			// listens
+			
 			// shuts down
 		}
 
