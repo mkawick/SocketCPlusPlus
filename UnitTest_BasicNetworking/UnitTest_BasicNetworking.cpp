@@ -12,6 +12,8 @@
 #include "../UDP01/OldCode/Packets/PacketFactory.h"
 #include "../UDP01/OldCode/Packets/MovementPacket.h"
 #include "../UDP01/OldCode/Socket/Socket.h"
+#include "../UDP01/OldCode/Socket/ClientSocket.h"
+#include "../UDP01/OldCode/Socket/ServerSocket.h"
 
 using namespace Microsoft::VisualStudio::CppUnitTestFramework;
 
@@ -1038,7 +1040,55 @@ namespace UnitTestBasicNetworking
 		}
 
 		// launching a basic client
+		TEST_METHOD(SocketTest_CreateTCPClient)
+		{
+			try
+			{
+				boost::asio::io_context io_context;
+				tcp::resolver::query query(tcp::v4(), "localhost", "1313" );
+				tcp::resolver resolve(io_context);
+				client c(io_context);
+
+				c.start(resolve.resolve(query));
+				io_context.run_for(boost::asio::chrono::seconds(5));
+
+				// we are just looking for errors here. this is a smoke test only.
+			}
+			catch (std::exception& e)
+			{
+				string errorText(e.what());
+				std::cerr << errorText << std::endl;
+			}
+		}
 
 		// client and server talk.
+		TEST_METHOD(SocketTest_ServerAndClient_FirstComms)
+		{
+			// create started
+			try
+			{
+				ServerSocket server(1313);
+				//----------------------------------------
+
+				boost::asio::io_context io_context;
+				tcp::resolver::query query(tcp::v4(), "localhost", "1313");
+				tcp::resolver resolve(io_context);
+				client c(io_context);
+
+				c.start(resolve.resolve(query));
+				io_context.run_for(boost::asio::chrono::seconds(5));
+
+				//----------------------------------------
+				
+			}
+			catch (std::exception& e)
+			{
+				string errorText(e.what());
+				std::cerr << errorText << std::endl;
+			}
+			// listens
+
+			// shuts down
+		}
 	};
 }
