@@ -1,7 +1,7 @@
 // Socket.h
 #pragma once
 
-#include "../DataTypes.h"
+
 #include <ctime>
 #include <iostream>
 #include <string>
@@ -18,6 +18,9 @@ using namespace std;
 using namespace boost::asio;
 using boost::asio::ip::tcp;
 using boost::asio::ip::udp;
+#include "../DataTypes.h"
+#include "../Packets/BasePacket.h"
+#include "../Packets/PacketFactory.h"
 
 // be sure to add D:\Develop\boost\stage\lib to the Additional Libraries
 // building boost: https://stackoverflow.com/questions/13042561/fatal-error-lnk1104-cannot-open-file-libboost-system-vc110-mt-gd-1-51-lib
@@ -25,33 +28,9 @@ using boost::asio::ip::udp;
 // _WIN32_WINNT=0x0A00
 // _WIN32_WINNT_WIN10   
 
-ip::address getLocalIPAddress()
-{
-    ip::address addr;
-    try {
-        boost::asio::io_service netService;
-        udp::resolver   resolver(netService);
-        udp::resolver::query query(udp::v4(), "google.com", "");
-        udp::resolver::iterator endpoints = resolver.resolve(query);
-        udp::endpoint ep = *endpoints;
-        udp::socket socket(netService);
-        socket.connect(ep);
-        addr = socket.local_endpoint().address();
-        //std::cout << "My IP according to google is: " << addr.to_string() << std::endl;
-    }
-    catch (std::exception& e) {
-        std::cerr << "Could not deal with socket. Exception: " << e.what() << std::endl;
+ip::address getLocalIPAddress();
 
-    }
-
-    return addr;
-}
-
-string MakeDaytimeString()// library problems
-{
-    time_t now = time(0);
-    return ctime(&now);
-}
+string MakeDaytimeString();
 
 /////////////////////////////////////////////////////////////
 /////////////////////////////////////////////////////////////
@@ -100,12 +79,13 @@ private:
 
 /////////////////////////////////////////////////////////////
 /////////////////////////////////////////////////////////////
+class TCPServer;
 
 class TCPConnection
     : public boost::enable_shared_from_this<TCPConnection>
 {
 public:
-    typedef boost::shared_ptr<TCPConnection> pointer;
+    typedef shared_ptr<TCPConnection> pointer;
 
     static pointer create(io_context& io_context)
     {
@@ -117,11 +97,24 @@ public:
         return socket_;
     }
 
+    void SetServer(TCPServer* srv) {server = srv;}
+
     void start()
     {
-        message_ = MakeDaytimeString();
+        SetupReceive();
+    }
 
-        async_write(socket_, boost::asio::buffer(message_),
+    void SendMessage(shared_ptr<BasePacket>& bp)
+    {
+        U8 buffer[120];
+
+        int outOffset = 0;
+        SizePacket sp;
+        sp.packet = bp;
+        Serialize::Out(buffer, outOffset, sp, 1);
+
+        //message_.length
+        async_write(socket_, boost::asio::buffer(buffer, outOffset),
             boost::bind(&TCPConnection::handle_write, shared_from_this()));
     }
 
@@ -136,7 +129,11 @@ private:
     {
         std::cout << "handle_write" << endl;
     }
+    void SetupReceive();
 
+
+    //deque<shared_ptr<IPacketSerializable>> inwardPackets;
+    TCPServer* server;
     tcp::socket socket_;
     string message_;
 };
@@ -155,11 +152,11 @@ public:
         start_accept();
     }
 
-    bool IsOpen()
+    bool IsOpen() const
     {
         acceptor_.is_open();
     }
-    bool IsListening()
+    bool IsListening() const
     {
         return isAccepting;
     }
@@ -170,13 +167,26 @@ public:
         io_context_.stop();
         //acceptor_.cancel();
     }
-    U16 GetPortAddr()
+    U16 GetPortAddr() const
     {
         return boundPortAddress;
     }
-    ip::address GetAddress()
+    ip::address GetAddress() const
     {
         return boundIpAddress;
+    }
+    int NumConnectedClients() const { return (int)connectionsMade.size(); }
+
+    void RemoveConnection(TCPConnection* conn) 
+    { 
+        for(auto i= connectionsMade.begin(); i!= connectionsMade.end(); i++)
+        {
+            if ((*i).get() == conn)
+            {
+                connectionsMade.erase(i);
+                return;
+            }
+        }
     }
 
 private:
@@ -210,17 +220,22 @@ private:
             boost::asio::ip::tcp::no_delay optionNagel(true); // nagel
             new_connection->socket().set_option(optionNagel);
             new_connection->start();
+            new_connection->SetServer(this);
+            //connectionsMade.push_back(new_connection);
+            connectionsMade.push_back(new_connection);
         }
 
         // start all over again
         start_accept();
     }
+    
 
     io_context& io_context_;
     tcp::acceptor acceptor_;
     bool isAccepting;
     U16 boundPortAddress;
     ip::address boundIpAddress;
+    list<TCPConnection::pointer> connectionsMade;
 };
 
 /////////////////////////////////////////////////////////////
@@ -229,7 +244,11 @@ private:
 class TCPThreader
 {
 public:
+    TCPThreader() = delete;
+    TCPThreader(const TCPThreader& t) = delete;
+    TCPThreader& operator=(const TCPThreader&) = delete;
 
+public:
     TCPThreader(U16 portAddr = 1313): portAddress(portAddr), tcpServer(nullptr),
         work(new io_service::work(myIoServiceType)) {}
     ~TCPThreader()
@@ -254,7 +273,7 @@ public:
         signals.async_wait(boost::bind(&boost::asio::io_service::stop, &myIoServiceType));
     }
 
-    bool IsConnected()
+    bool IsConnected() const 
     {
         if (tcpServer == nullptr)
             return false;
@@ -265,7 +284,7 @@ public:
     {
         work.reset();
     }
-    U16 GetPortAddr()
+    U16 GetPortAddr() const
     {
         if (tcpServer == nullptr)
             return portAddress;
@@ -277,17 +296,20 @@ public:
             return ip::address::from_string("0.0.0.0");
         return tcpServer->GetAddress();
     }
+    int NumConnectedClients() const { return tcpServer->NumConnectedClients(); }
 
-    void ThreadExit()
-    {
-        std::cout << "Socket closed and thread has exited" << std::endl;
-    }
+    
 private:
     TCPServer* tcpServer;
     boost::asio::io_service myIoServiceType;
     
     shared_ptr<io_service::work> work;
     U16 portAddress;
+
+    void ThreadExit()
+    {
+        std::cout << "Socket closed and thread has exited" << std::endl;
+    }
 };
 
 /*  void Foo()

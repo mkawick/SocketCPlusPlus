@@ -45,6 +45,9 @@
     <ClCompile Include="..\UDP01\OldCode\Utils\Utils.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="..\UDP01\OldCode\Socket\Socket.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="pch.h">

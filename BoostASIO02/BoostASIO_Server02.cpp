@@ -17,7 +17,7 @@ int main()
 {
     try
     {
-        TCPThreader thread;
+        TCPThreader thread(1313);
         thread.BeginService();
 
         _getch();

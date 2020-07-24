@@ -1,7 +1,11 @@
 // ClientSocket.h
 #pragma once
-
+#include <queue>
+using namespace std;
 #include "../DataTypes.h"
+#include "../Packets/Serialize.h"
+//#include "../../Packets/Serialize.h"
+//"../UDP01/OldCode/Packets/Serialize.h"
 //
 // async_tcp_client.cpp
 // ~~~~~~~~~~~~~~~~~~~~
@@ -93,9 +97,28 @@ public:
         : stopped_(false),
         socket_(io_context),
         deadline_(io_context),
-        heartbeat_timer_(io_context)
+        heartbeat_timer_(io_context),
+        isConnected(false)
     {
     }
+
+    void Write(shared_ptr<IPacketSerializable> packet)
+    {
+        packetOutDeque.push_back(packet);
+    }
+    int GetNumPendingOutgoingPackets() const { return (int) packetOutDeque.size(); }
+    void Read(deque<shared_ptr<IPacketSerializable>>& packetDeque, bool shouldClear = true)
+    {
+        for (auto i : packetInDeque)
+        {
+            packetDeque.push_back(i);
+        }
+        if (shouldClear == true)
+            packetInDeque.clear();
+    }
+    int GetNumPendingInwardPackets() const { return (int) packetInDeque.size(); }
+
+    bool IsConnected() const {return isConnected;}
 
     // Called by the user of the client class to initiate the connection process.
     // The endpoints will have been obtained using a tcp::resolver.
@@ -121,6 +144,7 @@ public:
         socket_.close(ignored_ec);
         deadline_.cancel();
         heartbeat_timer_.cancel();
+        isConnected = false;
     }
 
 private:
@@ -180,6 +204,8 @@ private:
         {
             std::cout << "Connected to " << endpoint_iter->endpoint() << "\n";
 
+            isConnected = true;
+
             // Start the input actor.
             start_read();
 
@@ -231,9 +257,20 @@ private:
         if (stopped_)
             return;
 
+        U8 buffer[100];
+        int outOffset = 0;
+        
+
+        for (auto bp : packetOutDeque)
+        {
+            Serialize::Out(buffer, outOffset, bp, 1);
+            auto var = boost::asio::buffer(buffer, outOffset);
+            boost::asio::async_write(socket_, var,
+                boost::bind(&client::handle_write, this, _1));
+        }
         // Start an asynchronous operation to send a heartbeat message.
-        boost::asio::async_write(socket_, boost::asio::buffer("\n", 1),
-            boost::bind(&client::handle_write, this, _1));
+     /*   boost::asio::async_write(socket_, boost::asio::buffer("\n", 1),
+            boost::bind(&client::handle_write, this, _1));*/
     }
 
     void handle_write(const boost::system::error_code& ec)
@@ -316,6 +353,10 @@ private:
     std::string input_buffer_;
     steady_timer deadline_;
     steady_timer heartbeat_timer_;
+    bool isConnected;
+
+    deque <shared_ptr<IPacketSerializable>> packetOutDeque;
+    deque <shared_ptr<IPacketSerializable>> packetInDeque;
 };
 /*
 int main(int argc, char* argv[])

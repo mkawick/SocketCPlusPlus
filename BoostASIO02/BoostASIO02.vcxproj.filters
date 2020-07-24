@@ -18,5 +18,20 @@
     <ClCompile Include="BoostASIO_Server02.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="..\UDP01\OldCode\Socket\Socket.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\UDP01\OldCode\Packets\BasePacket.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\UDP01\OldCode\Packets\MovementPacket.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\UDP01\OldCode\Packets\PacketFactory.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\UDP01\OldCode\Packets\Serialize.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
 </Project>

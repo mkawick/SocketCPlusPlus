@@ -11,6 +11,8 @@
 #include "../UDP01/OldCode/Packets/MovementPacket.h"
 #include "../UDP01/OldCode/Packets/PacketFactory.h"
 #include "../UDP01/OldCode/Packets/MovementPacket.h"
+#include "../UDP01/OldCode/Socket/PacketObserver.h"
+
 #include "../UDP01/OldCode/Socket/Socket.h"
 #include "../UDP01/OldCode/Socket/ClientSocket.h"
 #include "../UDP01/OldCode/Socket/ServerSocket.h"
@@ -1062,24 +1064,48 @@ namespace UnitTestBasicNetworking
 		}
 
 		// client and server talk.
-		TEST_METHOD(SocketTest_ServerAndClient_FirstComms)
+		TEST_METHOD(SocketTest_ServerAndClient_FirstComms2)
 		{
 			// create started
 			try
 			{
+				PacketMethodFactory::InitFactory();
+
 				ServerSocket server(1313);
+				PacketObserver serverPacketObserver;
+				server.Register(&serverPacketObserver);
 				//----------------------------------------
+				Assert::AreEqual(server.GetNumListeners(), 1);
 
 				boost::asio::io_context io_context;
 				tcp::resolver::query query(tcp::v4(), "localhost", "1313");
 				tcp::resolver resolve(io_context);
-				client c(io_context);
+				client testClient(io_context);
 
-				c.start(resolve.resolve(query));
-				io_context.run_for(boost::asio::chrono::seconds(5));
+				
+				testClient.start(resolve.resolve(query));
+				Sleep(100);
+
+				Assert::AreNotEqual(server.NumConnectedClients(), 0);
+				Assert::AreEqual(testClient.IsConnected(), true);
+				
+				//BasePacket bp;
+				//bp.packetSubType = BasePacket::SubType::BasePacket_Type;
+				auto pack = PacketMethodFactory::Create(PacketType_Base, ServerTickPacket::BasePacket_Type);
+				BasePacket* bp = dynamic_cast<BasePacket*>(pack->GetTypePtr());
+				bp->gameInstanceId = 13;
+				bp->gameProductId = 51;
+				testClient.Write(pack);
+				
+				Assert::AreEqual(testClient.GetNumPendingOutgoingPackets(), 1);
 
 				//----------------------------------------
-				
+				io_context.run_for(boost::asio::chrono::seconds(65));
+
+				//----------------------------------------
+
+				server.Unregister(&serverPacketObserver);
+				PacketMethodFactory::Shutdown();
 			}
 			catch (std::exception& e)
 			{

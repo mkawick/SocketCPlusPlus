@@ -1,5 +1,8 @@
+// MovementPacket.cpp
 
+#include <iostream>
 #include "./BasePacket.h"
+#include "./PacketFactory.h"
 #include "./MovementPacket.h"
 
 ///////////////////////////////////////////////////////////////
@@ -21,7 +24,6 @@ bool    ServerTickPacket::SerializeOut(U8* data, int& bufferOffset, int minorVer
 
 ///////////////////////////////////////////////////////////////
 
-SelfRegistery(PositionPacket)
 bool    PositionPacket::SerializeIn(const U8* data, int& bufferOffset, int minorVersion)
 {
     ServerTickPacket::SerializeIn(data, bufferOffset, minorVersion);
@@ -57,7 +59,6 @@ bool PositionPacket::s_typeRegistered = PacketMethodFactory::Register(PositionPa
 #endif*/
 ///////////////////////////////////////////////////////////////
 
-SelfRegistery(MovementPacket)
 bool    MovementPacket::SerializeIn(const U8* data, int& bufferOffset, int minorVersion)
 {
     PositionPacket::SerializeIn(data, bufferOffset, minorVersion);

@@ -1,13 +1,11 @@
 // Serialize.cpp
 
+#include <iostream>
 #include "../DataTypes.h"
 
 #if PLATFORM == PLATFORM_WINDOWS
-#include <Winsock2.h>
 
-U64 htonll(U64 value); // used for endianness
-U64 ntohll(U64 value);
-
+#include <winsock.h>
 // warning about loss of data for UINT 64 which does not apply
 #pragma warning( push )
 #pragma warning( disable : 4244 )
@@ -18,7 +16,7 @@ U64 ntohll(U64 value);
 #endif
 
 #if PLATFORM == PLATFORM_WINDOWS
-
+#ifndef htonll
 U64 htonll( U64 value ) 
 {
     int num = 42;
@@ -33,10 +31,14 @@ U64 htonll( U64 value )
         return value;
     }
 }
+#endif /* htonll */
 
+#ifndef ntohll
 U64 ntohll( U64 value ) 
 {
    return htonll( value );
 }
+
+#endif
 
 #endif

@@ -1,6 +1,8 @@
 // BasePacket.cpp
 
 
+#include <iostream>
+
 #include "../ServerConstants.h"
 #if PLATFORM == PLATFORM_WINDOWS
 #pragma warning( disable:4996 )
@@ -139,12 +141,6 @@ BasePacket::BasePacket(int packet_type, int packet_sub_type) :
     static_assert(GetSize() == predictedSize, "error");// this is meant to enforce maintenence as these values change
 }
 
-SelfRegistery(BasePacket)
-/*#ifdef _UNIT_TESTING_
-bool BasePacket::s_typeRegistered = false;
-#else
-bool BasePacket::s_typeRegistered = PacketMethodFactory::Register(BasePacket::GetFactoryName(), BasePacket::Type(), BasePacket::SubType(), BasePacket::CreateMethod);
-#endif*/
 
 BasePacket::~BasePacket()
 {

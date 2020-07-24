@@ -1,5 +1,7 @@
 #pragma once
 
+#include <iostream>
+
 #include "PacketFactory.h"
 #include "BasePacket.h"
 #include "MovementPacket.h"
@@ -13,6 +15,12 @@ using namespace std;
 map<string, PacketMethodFactory::TCreateMethod> PacketMethodFactory::s_methods;
 map<pair<U8, U8>, PacketMethodFactory::TCreateMethod> PacketMethodFactory::s_allocationMethods;
 map<pair<U8, U8>, circular_buffer<shared_ptr <IPacketSerializable>>* > PacketMethodFactory::s_creationPool;
+
+////////////////////////////////////////////////////////////////////////
+
+SelfRegistery(BasePacket)
+SelfRegistery(PositionPacket)
+SelfRegistery(MovementPacket)
 
 ////////////////////////////////////////////////////////////////////////
 
