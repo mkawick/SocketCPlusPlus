@@ -41,11 +41,18 @@ int main()
 
 	//BasePacket bp;
 	//bp.packetSubType = BasePacket::SubType::BasePacket_Type;
-	auto pack = PacketMethodFactory::Create(PacketType_Base, ServerTickPacket::BasePacket_Type);
+	auto pack = PacketMethodFactory::Create(PacketType_Base, BasePacket::BasePacket_Type);
 	BasePacket* bp = dynamic_cast<BasePacket*>(pack->GetTypePtr());
 	bp->gameInstanceId = 13;
 	bp->gameProductId = 56;
 	testClient.Write(pack);
+
+	auto pack2 = PacketMethodFactory::Create(PacketType_ServerTick, ServerTickPacket::ServerTick_Movement);
+	MovementPacket* mp = dynamic_cast<MovementPacket*>(pack2->GetTypePtr());
+	mp->gameInstanceId = 13;
+	mp->gameProductId = 56;
+	mp->Set(Vector3(1, 0, -1), Vector3(0, 0, 1), Vector3(-1, -0.2, -3.14159));
+	testClient.Write(pack2);
 
 	//Assert::AreEqual(testClient.GetNumPendingOutgoingPackets(), 1);
 
