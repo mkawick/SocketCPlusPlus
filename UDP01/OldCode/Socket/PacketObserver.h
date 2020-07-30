@@ -3,6 +3,11 @@
 using namespace std;
 #include "../Packets/BasePacket.h"
 
+class IPacketNotification
+{
+	virtual void Notify(U8 packetType, U8 packetSubType) = 0;
+};
+
 class PacketObserver
 {
 public:
@@ -20,6 +25,17 @@ public:
 	void Update(int& value)
 	{
 		value++;
+	}
+
+	int GetCount(U8 packetType, U8 packetSubType)
+	{
+		PacketPair key(packetType, packetSubType);
+		if (auto i = numberOfEachType.find(key); i == numberOfEachType.end())
+		{
+			return i->second;
+		}
+		
+		return 0;
 	}
 
 	typedef pair<int,int> PacketPair;

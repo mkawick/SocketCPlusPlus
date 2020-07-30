@@ -35,6 +35,7 @@ public:
 
     int NumConnectedClients() const { if (threader == nullptr) return 0; return threader->NumConnectedClients(); }
 
+    //------------------------------------------
     void Register(PacketObserver* listener)
     {
         if (find(listeners.begin(), listeners.end(), listener) != listeners.end())// already in there
@@ -50,8 +51,8 @@ public:
 
     int GetNumListeners() const { return (int) listeners.size(); }
 private:
-    TCPThreader* threader;
-    list< PacketObserver*> listeners;
+    TCPThreader* threader;     
+    list<PacketObserver*> listeners;
 };
 
 /////////////////////////////////////////////////////////////

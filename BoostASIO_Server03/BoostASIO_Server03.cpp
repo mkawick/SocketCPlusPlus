@@ -19,6 +19,13 @@ int main()
 	ServerSocket server(1313);
 	PacketObserver serverPacketObserver;
 	server.Register(&serverPacketObserver);
+
+	PacketMethodFactory::InitFactory();
+	auto pack = PacketMethodFactory::Create(PacketType_Base, ServerTickPacket::BasePacket_Type);
+	BasePacket* bp = dynamic_cast<BasePacket*>(pack->GetTypePtr());
+	bp->gameInstanceId = 13;
+	bp->gameProductId = 51;
+	//testClient.Write(pack);
 	//----------------------------------------
 	//Assert::AreEqual(server.GetNumListeners(), 1);
 
@@ -49,9 +56,12 @@ int main()
 
 	//----------------------------------------
 
+	//server.
 	server.Unregister(&serverPacketObserver);
     std::cout << "running... press any key\n";
 	_getch();
+
+	PacketMethodFactory::Shutdown();
 }
 
 // Run program: Ctrl + F5 or Debug > Start Without Debugging menu

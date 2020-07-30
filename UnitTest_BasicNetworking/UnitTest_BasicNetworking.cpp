@@ -1102,6 +1102,9 @@ namespace UnitTestBasicNetworking
 				//----------------------------------------
 				io_context.run_for(boost::asio::chrono::seconds(65));
 
+				//server.NumConnectedClients
+				//serverPacketObserver.
+				Assert::AreEqual(serverPacketObserver.GetCount(PacketType_Base, ServerTickPacket::BasePacket_Type),  1);
 				//----------------------------------------
 
 				server.Unregister(&serverPacketObserver);

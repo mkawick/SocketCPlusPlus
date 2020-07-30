@@ -257,20 +257,23 @@ private:
         if (stopped_)
             return;
 
-        U8 buffer[100];
+        U8 buffer[120];
         int outOffset = 0;
-        
+        SizePacket sp;
 
         for (auto bp : packetOutDeque)
         {
-            Serialize::Out(buffer, outOffset, bp, 1);
+            sp.packet = bp;
+            Serialize::Out(buffer, outOffset, sp, 1);
             auto var = boost::asio::buffer(buffer, outOffset);
             boost::asio::async_write(socket_, var,
                 boost::bind(&client::handle_write, this, _1));
+            PacketMethodFactory::Release(bp);
         }
         // Start an asynchronous operation to send a heartbeat message.
      /*   boost::asio::async_write(socket_, boost::asio::buffer("\n", 1),
             boost::bind(&client::handle_write, this, _1));*/
+        packetOutDeque.clear();
     }
 
     void handle_write(const boost::system::error_code& ec)
@@ -278,6 +281,7 @@ private:
         if (stopped_)
             return;
 
+        cout << "finished writing to socket" << endl;
         if (!ec)
         {
             // Wait 10 seconds before sending the next heartbeat.

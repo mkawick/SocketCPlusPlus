@@ -14,6 +14,14 @@
 #include "../UDP01/OldCode/Socket/ClientSocket.h"
 #include "../UDP01/OldCode/Socket/ServerSocket.h"
 
+void SendPacket(client& testClient)
+{
+	auto pack = PacketMethodFactory::Create(PacketType_Base, ServerTickPacket::BasePacket_Type);
+	BasePacket* bp = dynamic_cast<BasePacket*>(pack->GetTypePtr());
+	bp->gameInstanceId = 13;
+	bp->gameProductId = 51;
+	testClient.Write(pack);
+}
 
 int main()
 {
@@ -36,18 +44,26 @@ int main()
 	auto pack = PacketMethodFactory::Create(PacketType_Base, ServerTickPacket::BasePacket_Type);
 	BasePacket* bp = dynamic_cast<BasePacket*>(pack->GetTypePtr());
 	bp->gameInstanceId = 13;
-	bp->gameProductId = 51;
+	bp->gameProductId = 56;
 	testClient.Write(pack);
 
 	//Assert::AreEqual(testClient.GetNumPendingOutgoingPackets(), 1);
 
 	//----------------------------------------
 	io_context.run_for(boost::asio::chrono::seconds(65));
-    std::cout << "Hello World!\n";
+    std::cout << "Press a key to exit\n";
 
+	int key = 0;
+	while (key != 27)// escape
+	{
+		SendPacket(testClient);
+		key = getchar();
+	} 
 	PacketMethodFactory::Shutdown();
-	_getch();
+	
 }
+
+
 
 // Run program: Ctrl + F5 or Debug > Start Without Debugging menu
 // Debug program: F5 or Debug > Start Debugging menu

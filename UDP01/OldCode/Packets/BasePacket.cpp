@@ -175,6 +175,7 @@ bool  BasePacket::SerializeOut(U8* data, int& bufferOffset, int minorVersion) co
 }
 
 ///////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////
 
 bool  SizePacket::IsRemainingBufferBigenough(const U8* data, int& bufferOffset, int minorVersion, int totalBytesInBuffer)
 {
@@ -186,6 +187,7 @@ bool  SizePacket::IsRemainingBufferBigenough(const U8* data, int& bufferOffset, 
         return false;
     return true;
 }
+
 bool  SizePacket::SerializeIn(const U8* data, int& bufferOffset, int minorVersion)
 {
     U8 type;
@@ -202,6 +204,7 @@ bool  SizePacket::SerializeIn(const U8* data, int& bufferOffset, int minorVersio
     
     return true;
 }
+
 bool  SizePacket::SerializeOut(U8* data, int& bufferOffset, int minorVersion) const
 {
     Serialize::Out(data, bufferOffset, (U8)PacketType_NetworkProtocol, minorVersion);
@@ -214,3 +217,6 @@ bool  SizePacket::SerializeOut(U8* data, int& bufferOffset, int minorVersion) co
 
     return true;
 }
+
+///////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////
