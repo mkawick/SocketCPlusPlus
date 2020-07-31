@@ -89,10 +89,10 @@ private:
 class TCPServer;
 
 class TCPConnection
-    : public boost::enable_shared_from_this<TCPConnection>//, private boost::noncopyable
+    : public std::enable_shared_from_this<TCPConnection>//, private boost::noncopyable
 {
 public:
-    typedef shared_ptr<TCPConnection> pointer;
+    typedef std::shared_ptr<TCPConnection> pointer;
 
     static pointer create(io_context& io_context)
     {
@@ -103,13 +103,25 @@ public:
         return std::make_shared<make_shared_enabler>(io_context);
     }
 
-    tcp::socket& socket() { return socket_; }
+    std::shared_ptr<TCPConnection> getptr() {
+        return shared_from_this();
+    }
+
+    tcp::socket& GetSocket() { return socket_; }
+    void    Close()
+    {
+        hasClosed = true;
+
+        socket_.close();
+        socket_.release();
+    }
+    bool    IsClosed() const { return hasClosed; }
 
     //-------------------------------------------
 
     void    SetServer(TCPServer* srv) {server = srv;}
 
-    void    start();
+    void    Start();
 
     void    SendMessage(shared_ptr<IPacketSerializable>& bp);
     int     GetNumMessages() const noexcept { return (int)inwardPackets.size(); }
@@ -134,6 +146,7 @@ private:
     tcp::socket socket_;
     string message_;
     deque< shared_ptr<IPacketSerializable>> inwardPackets;
+    bool hasClosed;
 };
 
 /////////////////////////////////////////////////////////////
@@ -183,17 +196,21 @@ public:
         {
             if ((*i).get() == conn)
             {
-                connectionsMade.erase(i);
+                // todo, clean up old connections
+                //conn->Close();
+                //connectionsMade.erase(i);
+
                 return;
             }
         }
     }
+    void    CleanupClosedConnections();
 
-    void Start() {
-
-    }
+    void    HandleReschedule();
 //private:
     void    BeginAcceptingNewConnections();
+
+    void    RescheduleMe(TCPConnection::pointer conn);
 
     void handle_accept(TCPConnection::pointer new_connection,
         const boost::system::error_code& error);
@@ -205,6 +222,7 @@ public:
     U16 boundPortAddress;
     ip::address boundIpAddress;
     list<TCPConnection::pointer> connectionsMade;
+    list<TCPConnection::pointer> connectionsAwaitingSchedule;
 };
 
 /////////////////////////////////////////////////////////////
@@ -218,15 +236,8 @@ public:
     TCPThreader& operator=(const TCPThreader&) = delete;
 
 public:
-    TCPThreader(U16 portAddr = 1313): portAddress(portAddr), tcpServer(nullptr),
-        work(boost::asio::make_work_guard(myIoServiceType)) 
-    {
-    }
-    ~TCPThreader()
-    {
-        Stop();
-        delete tcpServer;
-    }
+    TCPThreader(U16 portAddr = 1313);
+    ~TCPThreader();
 
     void    BeginService();
 
@@ -266,22 +277,14 @@ private:
     boost::asio::io_service myIoServiceType;
     
     executor_work_guard<io_context::executor_type> work;
-    U16 portAddress;
-
-    void ThreadExit()
-    {
-        std::cout << "Socket closed and thread has exited" << std::endl;
-    }
-    void ThreadRun()
-    {
-        
-        while (1)
-        {
-            myIoServiceType.run();
-            //std::cout << "Running" << std::endl;
-            Sleep(10);
-        }
-    }
+    boost::thread_group threads;
+    U16     portAddress;
+    bool    isThreadRunning;
+    bool    launchListeningInThread;
+    //-----------------------------------
+    void    ThreadHasStarted();
+    void    ThreadRun();
+    void    CleanupClosedConnections();
 };
 
 /*  void Foo()

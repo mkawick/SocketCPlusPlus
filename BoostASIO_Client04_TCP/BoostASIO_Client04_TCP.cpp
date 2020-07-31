@@ -51,10 +51,13 @@ int main()
 	MovementPacket* mp = dynamic_cast<MovementPacket*>(pack2->GetTypePtr());
 	mp->gameInstanceId = 13;
 	mp->gameProductId = 56;
-	mp->Set(Vector3(1, 0, -1), Vector3(0, 0, 1), Vector3(-1, -0.2, -3.14159));
+	mp->Set(Vector3(1, 0, -1), Vector3(0, 0, 1), Vector3(-1, -0.2, -3.14159f));
 	testClient.Write(pack2);
 
 	//Assert::AreEqual(testClient.GetNumPendingOutgoingPackets(), 1);
+
+	cout << "sleeping for a bit" << endl;
+	Sleep(5000);
 
 	//----------------------------------------
 	io_context.run_for(boost::asio::chrono::seconds(65));

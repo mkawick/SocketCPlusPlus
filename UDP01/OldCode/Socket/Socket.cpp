@@ -28,40 +28,23 @@ string MakeDaytimeString()// library problems
     return ctime(&now);
 }
 
-
-void TCPThreader::BeginService()
+void LogPacket(shared_ptr<IPacketSerializable> packet)
 {
-    tcpServer = new TCPServer(myIoServiceType, portAddress);
-    tcpServer->BeginAcceptingNewConnections();
-
-    // give it some work, to prevent premature exit
-  /*  boost::thread autoProcess(boost::bind(&boost::asio::io_service::run, boost::ref(myIoServiceType)));// call run on the process
-    autoProcess.detach();*/
-    
- /*   boost::thread process(boost::bind(&TCPServer::BeginAcceptingNewConnections, tcpServer));
-    process.detach();*/
-
-    boost::thread process2(boost::bind(&TCPThreader::ThreadRun, this));// maybe not needed
-    process2.detach();
-    boost::asio::io_service::work work(myIoServiceType);
-
-    myIoServiceType.post(boost::bind(&TCPThreader::ThreadExit, this));
-    //https://www.boost.org/doc/libs/1_67_0/doc/html/boost_asio/reference/LegacyCompletionHandler.html
-
-    boost::asio::signal_set signals{ myIoServiceType, SIGINT, SIGTERM };// graceful exit
-    signals.async_wait(boost::bind(&boost::asio::io_service::stop, &myIoServiceType));
-
-    //myIoServiceType.run();
+    cout << "Packet received:" << endl;
+    cout << "    " << packet->GetName() << endl;
+    cout << "     (" << (int)packet->GetType() << ", " << (int)packet->GetSubType() << ")" << endl;
 }
+
+//////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////
 
 void    TCPServer::BeginAcceptingNewConnections()
 {
-    TCPConnection::pointer new_connection =
-        TCPConnection::create(io_context_);
+    TCPConnection::pointer new_connection = TCPConnection::create(io_context_);
 
-    std::cout << "BeginAcceptingNewConnections" << endl;
+    std::cout << "** BeginAcceptingNewConnections ***" << endl;
     //
-    acceptor_.async_accept(new_connection->socket(),
+    acceptor_.async_accept(new_connection->GetSocket(),
         boost::bind(&TCPServer::handle_accept, this, new_connection,
             boost::asio::placeholders::error));
 
@@ -72,46 +55,173 @@ void    TCPServer::BeginAcceptingNewConnections()
 
 void    TCPServer::handle_accept(TCPConnection::pointer new_connection, const boost::system::error_code& error)
 {
-    std::cout << "handle accept" << endl;
-    if (!error)
+    if (error)
     {
+        std::cout << " Error on listening socket during accepting New Connection " << endl;
+    }
+    else
+    {
+        std::cout << " Accepting New Connection " << endl;
         boost::asio::socket_base::receive_buffer_size optionBufferSize(8192);
-        new_connection->socket().set_option(optionBufferSize);
+        new_connection->GetSocket().set_option(optionBufferSize);
         boost::asio::socket_base::keep_alive optionKeepAlive(true);
-        new_connection->socket().set_option(optionKeepAlive);
+        new_connection->GetSocket().set_option(optionKeepAlive);
+        boost::asio::ip::tcp::no_delay optionNagel(true); // nagel
+        new_connection->GetSocket().set_option(optionNagel);
 
         // std::string sClientIp = socket().remote_endpoint().address().to_string();
         // unsigned short uiClientPort = socket().remote_endpoint().port();
 
-        boost::asio::ip::tcp::no_delay optionNagel(true); // nagel
-        new_connection->socket().set_option(optionNagel);
-        new_connection->start();
         new_connection->SetServer(this);
+        
+        RescheduleMe(new_connection);
         connectionsMade.push_back(new_connection);
     }
 
     // start all over again
     BeginAcceptingNewConnections();
 }
-///////////////////////////////////////////////////////////
+
+void    TCPServer::RescheduleMe(TCPConnection::pointer conn)
+{
+    // needs threading protection
+    connectionsAwaitingSchedule.push_back(conn);
+}
+
+void    TCPServer::HandleReschedule()
+{
+    // needs threading magic
+    for (auto it : connectionsAwaitingSchedule)
+    {
+        it->Start();
+    }
+
+    connectionsAwaitingSchedule.clear();
+}
+
+void    TCPServer::CleanupClosedConnections()
+{
+    for (auto it = connectionsMade.begin(); it != connectionsMade.end(); )
+    {
+        auto it2 = it++;
+        auto val = *it2;
+        if ((*it2)->IsClosed())
+        {
+            connectionsMade.erase(it2);
+            TCPConnection* memory = val.get();
+            val.reset();
+            cout << "releasing connection" << endl;
+            //delete memory;
+            //delete val.;
+        }
+    }
+}
+
+//////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////
+TCPThreader::TCPThreader(U16 portAddr) : 
+    portAddress(portAddr), 
+    tcpServer(nullptr), 
+    isThreadRunning(false), 
+    launchListeningInThread(false),
+    work(boost::asio::make_work_guard(myIoServiceType))
+{
+}
+TCPThreader::~TCPThreader()
+{
+    Stop();
+    threads.join_all();
+    delete tcpServer;
+}
+void TCPThreader::BeginService()
+{
+    tcpServer = new TCPServer(myIoServiceType, portAddress);
+    if (launchListeningInThread == false)
+    {
+        boost::thread process(boost::bind(&TCPServer::BeginAcceptingNewConnections, tcpServer));
+        process.detach();
+    }
+    else
+    {
+        tcpServer->BeginAcceptingNewConnections();
+    }
+
+    isThreadRunning = true;
+
+    for (size_t i = 0; i < 5; ++i) {
+        boost::thread* t = threads.create_thread(boost::bind(&boost::asio::io_service::run, &myIoServiceType));
+        std::cout << "Creating thread " << i << " with id " << t->get_id() << std::endl;
+    }
+
+    boost::thread process2(boost::bind(&TCPThreader::ThreadRun, this));// maybe not needed
+    process2.detach();
+    //boost::asio::io_service::work work(myIoServiceType);
+
+    myIoServiceType.post(boost::bind(&TCPThreader::ThreadHasStarted, this));
+    //https://www.boost.org/doc/libs/1_67_0/doc/html/boost_asio/reference/LegacyCompletionHandler.html
+
+    boost::asio::signal_set signals{ myIoServiceType, SIGINT, SIGTERM };// graceful exit
+    signals.async_wait(boost::bind(&boost::asio::io_service::stop, &myIoServiceType));
+}
+
+void    TCPThreader::ThreadHasStarted()
+{
+    string networkName = "Axiom";
+    std::cout << "----------------------------------------------------------------------------------" << std::endl;
+    std::cout << "-------------- Successful start of networking engine: " << networkName << " ----------------------" << std::endl;
+    std::cout << "-------------- Listening socket started and main service running -----------------" << std::endl;
+    std::cout << "----------------------------------------------------------------------------------" << std::endl;
+}
+void    TCPThreader::ThreadRun()
+{
+    std::cout << "Servicing thread running" << std::endl;
+    while (isThreadRunning)
+    {
+        myIoServiceType.run();
+        
+        Sleep(10);
+
+        CleanupClosedConnections();
+
+        tcpServer->HandleReschedule();
+    }
+    std::cout << "Servicing thread exited" << std::endl;
+}
+
+void    TCPThreader::CleanupClosedConnections()
+{
+    //myIoServiceType.post(boost::bind(&TCPThreader::ThreadExit, this));
+    if (launchListeningInThread)
+    {
+
+    }
+    else
+    {
+        tcpServer->CleanupClosedConnections();
+    }
+}
+
+//////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////
 
 TCPConnection::TCPConnection(io_context& io_context)
-    : socket_(io_context)
+    : socket_(io_context),
+    hasClosed(false)
 {
     std::cout << "new tcp connection" << endl;
 }
-void    TCPConnection::start()
+void    TCPConnection::Start()
 {
-    //SetupReceive();
+    SetupReceive();
     
-    cout << "New connection thread starting" << endl;
-    boost::thread process(boost::bind(&TCPConnection::SetupReceive, this));
-    process.detach();
+    cout << "SetupReceive starting" << endl;
+   /* boost::thread process(boost::bind(&TCPConnection::SetupReceive, this));
+    process.detach();*/
     
 }
 void TCPConnection::SetupReceive()
 {
-    while (1) // in a thread
+    //while (hasClosed == false) // in a thread
     {
         socket_.async_read_some(boost::asio::buffer(receiveBuffer, max_length),
             [this, buffer = std::move(receiveBuffer)](boost::system::error_code ec, std::size_t length)
@@ -127,20 +237,27 @@ void TCPConnection::SetupReceive()
                     BasePacket* bp2 = dynamic_cast<BasePacket*>(sp2.packet->GetTypePtr());
 
                     inwardPackets.push_back(sp2.packet);
+
+                    LogPacket(sp2.packet);
                     sp2.packet.reset();
                     index++;
                 }
+
+                server->RescheduleMe(shared_from_this());
             }
             else
             {
                 cout << "error or DC" << endl;
                 // todo, we must queue the release, not a direct removal. shared_ptr helps a bit
-                server->RemoveConnection(this);
+                
+                this->Close();
+                server->RemoveConnection(this); // needs to be moved out of this thread
                 return;
             }
         });
     }
 }
+
 
 void TCPConnection::SendMessage(shared_ptr<IPacketSerializable>& bp)
 {
@@ -161,3 +278,5 @@ void TCPConnection::DequeMessage()
     inwardPackets.pop_front();
     PacketMethodFactory::Release(i);
 }
+//////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////
