@@ -19,6 +19,7 @@ map<pair<U8, U8>, circular_buffer<shared_ptr <IPacketSerializable>>* > PacketMet
 ////////////////////////////////////////////////////////////////////////
 
 SelfRegistery(BasePacket)
+SelfRegistery(ConnectionCommsPacket)
 SelfRegistery(PositionPacket)
 SelfRegistery(MovementPacket)
 
@@ -69,12 +70,12 @@ bool PacketMethodFactory::Register(const string& name, U8 type, U8 subType, TCre
     bool success = false;
     auto matchPair = pair<U8, U8>(type, subType);
     if (auto it = s_allocationMethods.find(matchPair); it == s_allocationMethods.end())
-    { // C++17 init-if ^^
+    { 
         s_allocationMethods[matchPair] = funcCreate;
         success = true;
     }
     if (auto it = s_methods.find(name); it == s_methods.end())
-    { // C++17 init-if ^^
+    { 
         s_methods[name] = funcCreate;
         success = true;
     }

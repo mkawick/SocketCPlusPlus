@@ -147,7 +147,22 @@ public: // factory interface
 
     FactoryBoilerplate(BasePacket, PacketType_Base, BasePacket_Type);
 };
+///////////////////////////////////////////////////////////////
 
+class ConnectionCommsPacket : public BasePacket
+{
+public:
+    ConnectionCommsPacket(int packet_sub_type = BasePacket_CommsHandshake) : BasePacket(PacketType_Base, packet_sub_type) {}
+    bool    SerializeIn(const U8* data, int& bufferOffset, int minorVersion);
+    bool    SerializeOut(U8* data, int& bufferOffset, int minorVersion) const;
+
+    U16     connectionId;
+
+    //--------------------------------------------------
+public: // factory interface
+    static constexpr int   GetSize();
+    FactoryBoilerplate(ConnectionCommsPacket, PacketType_Base, BasePacket::BasePacket_CommsHandshake);
+};
 ///////////////////////////////////////////////////////////////
 ///////////////////////////////////////////////////////////////
 

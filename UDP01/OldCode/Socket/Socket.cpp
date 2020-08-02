@@ -38,14 +38,21 @@ void LogPacket(shared_ptr<IPacketSerializable> packet)
 //////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////
 
+void    TCPServer::Start()
+{
+    boost::thread process(boost::bind(&TCPServer::BeginAcceptingNewConnections, this));
+    process.detach();
+}
+
 void    TCPServer::BeginAcceptingNewConnections()
 {
-    TCPConnection::pointer new_connection = TCPConnection::create(io_context_);
+    TCPConnection::pointer newConnection = TCPConnection::Create(io_context_);
+    newConnection->SetConnectionId(connectionIdTracking++);
 
     std::cout << "** BeginAcceptingNewConnections ***" << endl;
-    //
-    acceptor_.async_accept(new_connection->GetSocket(),
-        boost::bind(&TCPServer::handle_accept, this, new_connection,
+    acceptor_.set_option(boost::asio::ip::tcp::acceptor::reuse_address(true));
+    acceptor_.async_accept(newConnection->GetSocket(),
+        boost::bind(&TCPServer::NewConnectionAcceptedHandler, this, newConnection,
             boost::asio::placeholders::error));
 
     isAccepting = true;
@@ -53,7 +60,7 @@ void    TCPServer::BeginAcceptingNewConnections()
     boundIpAddress = acceptor_.local_endpoint().address();
 }
 
-void    TCPServer::handle_accept(TCPConnection::pointer new_connection, const boost::system::error_code& error)
+void    TCPServer::NewConnectionAcceptedHandler(TCPConnection::pointer newConnection, const boost::system::error_code& error)
 {
     if (error)
     {
@@ -63,19 +70,19 @@ void    TCPServer::handle_accept(TCPConnection::pointer new_connection, const bo
     {
         std::cout << " Accepting New Connection " << endl;
         boost::asio::socket_base::receive_buffer_size optionBufferSize(8192);
-        new_connection->GetSocket().set_option(optionBufferSize);
+        newConnection->GetSocket().set_option(optionBufferSize);
         boost::asio::socket_base::keep_alive optionKeepAlive(true);
-        new_connection->GetSocket().set_option(optionKeepAlive);
+        newConnection->GetSocket().set_option(optionKeepAlive);
         boost::asio::ip::tcp::no_delay optionNagel(true); // nagel
-        new_connection->GetSocket().set_option(optionNagel);
+        newConnection->GetSocket().set_option(optionNagel);
 
         // std::string sClientIp = socket().remote_endpoint().address().to_string();
         // unsigned short uiClientPort = socket().remote_endpoint().port();
 
-        new_connection->SetServer(this);
+        newConnection->SetServer(this);
         
-        RescheduleMe(new_connection);
-        connectionsMade.push_back(new_connection);
+        RescheduleMe(newConnection);
+        connectionsMade.push_back(newConnection);
     }
 
     // start all over again
@@ -123,7 +130,6 @@ TCPThreader::TCPThreader(U16 portAddr) :
     portAddress(portAddr), 
     tcpServer(nullptr), 
     isThreadRunning(false), 
-    launchListeningInThread(false),
     work(boost::asio::make_work_guard(myIoServiceType))
 {
 }
@@ -136,16 +142,8 @@ TCPThreader::~TCPThreader()
 void TCPThreader::BeginService()
 {
     tcpServer = new TCPServer(myIoServiceType, portAddress);
-    if (launchListeningInThread == false)
-    {
-        boost::thread process(boost::bind(&TCPServer::BeginAcceptingNewConnections, tcpServer));
-        process.detach();
-    }
-    else
-    {
-        tcpServer->BeginAcceptingNewConnections();
-    }
-
+    tcpServer->Start();
+    
     isThreadRunning = true;
 
     for (size_t i = 0; i < 5; ++i) {
@@ -161,6 +159,7 @@ void TCPThreader::BeginService()
     //https://www.boost.org/doc/libs/1_67_0/doc/html/boost_asio/reference/LegacyCompletionHandler.html
 
     boost::asio::signal_set signals{ myIoServiceType, SIGINT, SIGTERM };// graceful exit
+    // , SIGQUIT, SIGTSTP
     signals.async_wait(boost::bind(&boost::asio::io_service::stop, &myIoServiceType));
 }
 
@@ -181,24 +180,19 @@ void    TCPThreader::ThreadRun()
         
         Sleep(10);
 
-        CleanupClosedConnections();
+        if(isThreadRunning == true)
+            CleanupClosedConnections();
 
-        tcpServer->HandleReschedule();
+        if (isThreadRunning == true)
+            tcpServer->HandleReschedule();
     }
     std::cout << "Servicing thread exited" << std::endl;
 }
 
 void    TCPThreader::CleanupClosedConnections()
 {
-    //myIoServiceType.post(boost::bind(&TCPThreader::ThreadExit, this));
-    if (launchListeningInThread)
-    {
-
-    }
-    else
-    {
-        tcpServer->CleanupClosedConnections();
-    }
+    // there may need to be threading protections
+    tcpServer->CleanupClosedConnections();
 }
 
 //////////////////////////////////////////////////////////////////
@@ -211,51 +205,41 @@ TCPConnection::TCPConnection(io_context& io_context)
     std::cout << "new tcp connection" << endl;
 }
 void    TCPConnection::Start()
-{
-    SetupReceive();
-    
-    cout << "SetupReceive starting" << endl;
-   /* boost::thread process(boost::bind(&TCPConnection::SetupReceive, this));
-    process.detach();*/
-    
-}
-void TCPConnection::SetupReceive()
-{
-    //while (hasClosed == false) // in a thread
+{    
+    cout << "SetupReceive starting" << endl << "    connectionId: " << connectionId << endl;
+    socket_.async_read_some(boost::asio::buffer(receiveBuffer, max_length),
+        [this, buffer = std::move(receiveBuffer)](boost::system::error_code errorCode, std::size_t length)
     {
-        socket_.async_read_some(boost::asio::buffer(receiveBuffer, max_length),
-            [this, buffer = std::move(receiveBuffer)](boost::system::error_code ec, std::size_t length)
+        if (!errorCode)
         {
-            if (!ec)
+            int inOffset = 0;
+            int index = 0;
+            SizePacket sp2;
+            while (sp2.IsRemainingBufferBigenough(buffer, inOffset, 1, (int)length))
             {
-                int inOffset = 0;
-                int index = 0;
-                SizePacket sp2;
-                while (sp2.IsRemainingBufferBigenough(buffer, inOffset, 1, (int)length))
-                {
-                    Serialize::In(buffer, inOffset, sp2, 1);
-                    BasePacket* bp2 = dynamic_cast<BasePacket*>(sp2.packet->GetTypePtr());
+                Serialize::In(buffer, inOffset, sp2, 1);
+                BasePacket* bp2 = dynamic_cast<BasePacket*>(sp2.packet->GetTypePtr());
 
-                    inwardPackets.push_back(sp2.packet);
+                inwardPackets.push_back(sp2.packet);
 
-                    LogPacket(sp2.packet);
-                    sp2.packet.reset();
-                    index++;
-                }
-
-                server->RescheduleMe(shared_from_this());
+                LogPacket(sp2.packet);
+                sp2.packet.reset();
+                index++;
             }
-            else
-            {
-                cout << "error or DC" << endl;
-                // todo, we must queue the release, not a direct removal. shared_ptr helps a bit
+
+            server->RescheduleMe(shared_from_this());
+        }
+        else
+        {
+            cout << "error or DC" << endl;
+            cout << "error code was: " << errorCode << endl;
+            // todo, we must queue the release, not a direct removal. shared_ptr helps a bit
                 
-                this->Close();
-                server->RemoveConnection(this); // needs to be moved out of this thread
-                return;
-            }
-        });
-    }
+            this->Close();
+            server->RemoveConnection(this); // needs to be moved out of this thread
+            return;
+        }
+    });
 }
 
 

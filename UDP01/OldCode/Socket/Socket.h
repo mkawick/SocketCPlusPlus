@@ -94,10 +94,8 @@ class TCPConnection
 public:
     typedef std::shared_ptr<TCPConnection> pointer;
 
-    static pointer create(io_context& io_context)
+    static pointer Create(io_context& io_context)
     {
-        //return std::make_shared<TCPConnection>(io_context);
-            //pointer(new TCPConnection(io_context));
         struct make_shared_enabler : public TCPConnection { make_shared_enabler(boost::asio::io_context& io_context) :TCPConnection(io_context) {} };
 
         return std::make_shared<make_shared_enabler>(io_context);
@@ -107,6 +105,7 @@ public:
         return shared_from_this();
     }
 
+    //-----------------------------------------------------------
     tcp::socket& GetSocket() { return socket_; }
     void    Close()
     {
@@ -117,6 +116,8 @@ public:
     }
     bool    IsClosed() const { return hasClosed; }
 
+    void    SetConnectionId(U16 connId) { connectionId = connId; }
+    U16     GetConnectionId() const { return connectionId; }
     //-------------------------------------------
 
     void    SetServer(TCPServer* srv) {server = srv;}
@@ -136,7 +137,6 @@ private:
     {
         std::cout << "handle_write" << endl;
     }
-    void SetupReceive();
 
 
     static const int max_length = 512;
@@ -147,6 +147,7 @@ private:
     string message_;
     deque< shared_ptr<IPacketSerializable>> inwardPackets;
     bool hasClosed;
+    U16 connectionId;
 };
 
 /////////////////////////////////////////////////////////////
@@ -158,12 +159,9 @@ public:
     TCPServer(io_context& io_context, U16 portAddress = 1313)
         : io_context_(io_context),
         acceptor_(io_context, tcp::endpoint(tcp::v4(), portAddress)),
-        isAccepting(false)
-    {
-
-        acceptor_.set_option(boost::asio::ip::tcp::acceptor::reuse_address(true));
-        //BeginAcceptingNewConnections();
-    }
+        isAccepting(false),
+        connectionIdTracking(connectionIdStart)
+    {}
 
     bool    IsOpen() const
     {
@@ -174,11 +172,14 @@ public:
         return isAccepting;
     }
 
+    void    Start();
     void    Stop()
     {
         io_context_.stop();
         //acceptor_.cancel();
     }
+
+    //--------------------------------------------------------
     U16     GetPortAddr() const
     {
         return boundPortAddress;
@@ -190,6 +191,7 @@ public:
 
     int     NumConnectedClients() const { return (int)connectionsMade.size(); }
 
+    //--------------------------------------------------------
     void    RemoveConnection(TCPConnection* conn) 
     { 
         for(auto i= connectionsMade.begin(); i!= connectionsMade.end(); i++)
@@ -207,15 +209,15 @@ public:
     void    CleanupClosedConnections();
 
     void    HandleReschedule();
-//private:
-    void    BeginAcceptingNewConnections();
-
     void    RescheduleMe(TCPConnection::pointer conn);
 
-    void handle_accept(TCPConnection::pointer new_connection,
+private:
+    void    BeginAcceptingNewConnections();
+    void    NewConnectionAcceptedHandler(TCPConnection::pointer new_connection,
         const boost::system::error_code& error);
     
-
+    const static int connectionIdStart = 1024;
+    int connectionIdTracking;
     io_context& io_context_;
     tcp::acceptor acceptor_;
     bool isAccepting;
@@ -280,24 +282,8 @@ private:
     boost::thread_group threads;
     U16     portAddress;
     bool    isThreadRunning;
-    bool    launchListeningInThread;
     //-----------------------------------
     void    ThreadHasStarted();
     void    ThreadRun();
     void    CleanupClosedConnections();
 };
-
-/*  void Foo()
-  {
-      boost::asio::io_service io_service;
-      // give it some work, to prevent premature exit
-      ///shared_ptr<io_service::work> work(new io_service::work(io_service));
-
-      boost::thread t(boost::bind(&boost::asio::io_service::run, &io_service));
-
-      t.detach();
-      //...
-      io_service.post(boost::bind(&TCPThreader::ThreadExit, this));
-  // https://www.boost.org/doc/libs/1_67_0/doc/html/boost_asio/reference/LegacyCompletionHandler.html
-      //io_service.post(yourFunctor);
-  }*/

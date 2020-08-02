@@ -25,6 +25,7 @@ public:
 	FactoryMock() 
 	{ 
 		MockRegistery(BasePacket);
+		MockRegistery(ConnectionCommsPacket);
 		MockRegistery(PositionPacket);
 		MockRegistery(MovementPacket);
 
@@ -35,6 +36,7 @@ public:
 	{
 		PacketMethodFactory::Shutdown();
 		BasePacket::s_typeRegistered = false;
+		ConnectionCommsPacket::s_typeRegistered = false;
 		PositionPacket::s_typeRegistered = false;
 		MovementPacket::s_typeRegistered = false;
 	}
@@ -641,6 +643,11 @@ namespace UnitTestBasicNetworking
 			Assert::AreEqual((U8)PacketType::PacketType_Base, pack.get()->GetType());
 			Assert::AreEqual((U8)BasePacket::BasePacket_Type, pack.get()->GetSubType());
 
+			shared_ptr<IPacketSerializable> packComms = PacketMethodFactory::Create(PacketType_Base, BasePacket::BasePacket_CommsHandshake);
+			Assert::AreEqual((string)("ConnectionCommsPacket"), packComms.get()->GetName());
+			Assert::AreEqual((U8)PacketType::PacketType_Base, packComms.get()->GetType());
+			Assert::AreEqual((U8)BasePacket::BasePacket_CommsHandshake, packComms.get()->GetSubType());
+
 			shared_ptr<IPacketSerializable> pack2 = PacketMethodFactory::Create("PositionPacket");
 			Assert::AreEqual((string)("PositionPacket"), pack2.get()->GetName());
 			Assert::AreEqual((U8)PacketType::PacketType_ServerTick, pack2.get()->GetType());
@@ -653,14 +660,20 @@ namespace UnitTestBasicNetworking
 			Vector3 rotationTest(20, 17, -20);
 			pp->Set(positionTest, rotationTest);
 
+			U16 connectionId = 24;
+			ConnectionCommsPacket* comms = dynamic_cast<ConnectionCommsPacket*>(packComms.get());
+			comms->connectionId = connectionId;
+
+
 			shared_ptr<IPacketSerializable> pack3 = PacketMethodFactory::Create("MovementPacket");
 			Assert::AreEqual((string)("MovementPacket"), pack3.get()->GetName());
 			Assert::AreEqual((U8)PacketType::PacketType_ServerTick, pack3.get()->GetType());
 			Assert::AreEqual((U8)ServerTickPacket::ServerTick_Movement, pack3.get()->GetSubType());
 
-			U8 buffer[100];
+			U8 buffer[200];
 			int outOffset = 0;
 			Serialize::Out(buffer, outOffset, *pack, 1);
+			Serialize::Out(buffer, outOffset, *packComms, 1);			
 			Serialize::Out(buffer, outOffset, *pack3.get(), 1);
 			Serialize::Out(buffer, outOffset, *pack2.get(), 1);
 
@@ -669,6 +682,10 @@ namespace UnitTestBasicNetworking
 			Serialize::In(buffer, sampleOffset, sampler, 1);
 			shared_ptr<IPacketSerializable> unpack1 = PacketMethodFactory::Create(sampler.packetType, sampler.packetSubType);
 			Serialize::In(buffer, inOffset, *unpack1, 1);
+			sampleOffset = inOffset;
+			Serialize::In(buffer, sampleOffset, sampler, 1);
+			shared_ptr<IPacketSerializable> unpack4 = PacketMethodFactory::Create(sampler.packetType, sampler.packetSubType);
+			Serialize::In(buffer, inOffset, *unpack4, 1);
 			sampleOffset = inOffset;
 			Serialize::In(buffer, sampleOffset, sampler, 1);
 			shared_ptr<IPacketSerializable> unpack2 = PacketMethodFactory::Create(sampler.packetType, sampler.packetSubType);
@@ -689,6 +706,12 @@ namespace UnitTestBasicNetworking
 			Assert::AreEqual((U8)PacketType::PacketType_ServerTick, unpack3.get()->GetType());
 			Assert::AreEqual((U8)ServerTickPacket::ServerTick_Position, unpack3.get()->GetSubType());
 			PositionPacket* pp2 = dynamic_cast<PositionPacket*>(unpack3.get());
+
+			Assert::AreEqual((string)("ConnectionCommsPacket"), unpack4.get()->GetName());
+			Assert::AreEqual((U8)PacketType::PacketType_Base, unpack4.get()->GetType());
+			Assert::AreEqual((U8)BasePacket::BasePacket_CommsHandshake, unpack4.get()->GetSubType());
+			comms = dynamic_cast<ConnectionCommsPacket*>(unpack4.get());
+			Assert::AreEqual((int)comms->connectionId, (int)connectionId);
 
 			float rotEpsilon = 0.36f;
 			Vector3 resultPos, resultRot;// , resultMov;

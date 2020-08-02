@@ -173,6 +173,22 @@ bool  BasePacket::SerializeOut(U8* data, int& bufferOffset, int minorVersion) co
 
     return true;
 }
+///////////////////////////////////////////////////////////////
+
+bool    ConnectionCommsPacket::SerializeIn(const U8* data, int& bufferOffset, int minorVersion)
+{
+    BasePacket::SerializeIn(data, bufferOffset, minorVersion);
+    Serialize::In(data, bufferOffset, connectionId, minorVersion);
+
+    return true;
+}
+bool    ConnectionCommsPacket::SerializeOut(U8* data, int& bufferOffset, int minorVersion) const
+{
+    BasePacket::SerializeOut(data, bufferOffset, minorVersion);
+    Serialize::Out(data, bufferOffset, connectionId, minorVersion);
+
+    return true;
+}
 
 ///////////////////////////////////////////////////////////////
 ///////////////////////////////////////////////////////////////
