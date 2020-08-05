@@ -36,5 +36,8 @@
     <ClCompile Include="..\UDP01\OldCode\Packets\Serialize.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="..\UDP01\OldCode\Socket\ClientSocket.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
 </Project>

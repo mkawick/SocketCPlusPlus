@@ -250,6 +250,10 @@ public:
         return tcpServer->IsListening();
     }
 
+    void PrepareStop()
+    {
+        isThreadRunning = false;
+    }
     void    Stop()
     {
         std::cout << "work.Reset()" << std::endl;

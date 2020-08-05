@@ -1023,6 +1023,7 @@ namespace UnitTestBasicNetworking
 
 	TEST_CLASS(UnitTestBasicNetworking_TcpSocket)
 	{
+		FactoryMock* mock;
 		//  launching a basic server
 		TEST_METHOD(SocketTest_CreateTCPServer)
 		{
@@ -1072,7 +1073,7 @@ namespace UnitTestBasicNetworking
 				boost::asio::io_context io_context;
 				tcp::resolver::query query(tcp::v4(), "localhost", "1313" );
 				tcp::resolver resolve(io_context);
-				client c(io_context);
+				TCPClient c(io_context);
 
 				c.start(resolve.resolve(query));
 				io_context.run_for(boost::asio::chrono::seconds(5));
@@ -1089,6 +1090,7 @@ namespace UnitTestBasicNetworking
 		// client and server talk.
 		TEST_METHOD(SocketTest_ServerAndClient_FirstComms2)
 		{
+			//mock = new FactoryMock();
 			// create started
 			try
 			{
@@ -1100,14 +1102,16 @@ namespace UnitTestBasicNetworking
 				//----------------------------------------
 				Assert::AreEqual(server.GetNumListeners(), 1);
 
+				Sleep(100);
+
 				boost::asio::io_context io_context;
 				tcp::resolver::query query(tcp::v4(), "localhost", "1313");
 				tcp::resolver resolve(io_context);
-				client testClient(io_context);
+				TCPClient testClient(io_context);
 
 				
 				testClient.start(resolve.resolve(query));
-				Sleep(100);
+				Sleep(500);
 
 				Assert::AreNotEqual(server.NumConnectedClients(), 0);
 				Assert::AreEqual(testClient.IsConnected(), true);
@@ -1123,7 +1127,7 @@ namespace UnitTestBasicNetworking
 				Assert::AreEqual(testClient.GetNumPendingOutgoingPackets(), 1);
 
 				//----------------------------------------
-				io_context.run_for(boost::asio::chrono::seconds(65));
+				io_context.run_for(boost::asio::chrono::seconds(30));
 
 				//server.NumConnectedClients
 				//serverPacketObserver.
@@ -1131,6 +1135,9 @@ namespace UnitTestBasicNetworking
 				//----------------------------------------
 
 				server.Unregister(&serverPacketObserver);
+
+				Sleep(19);
+				//server.S
 				PacketMethodFactory::Shutdown();
 			}
 			catch (std::exception& e)
@@ -1141,6 +1148,7 @@ namespace UnitTestBasicNetworking
 			// listens
 
 			// shuts down
+			//delete mock;
 		}
 	};
 }

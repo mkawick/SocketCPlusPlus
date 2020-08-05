@@ -1,11 +1,6 @@
 // ClientSocket.h
 #pragma once
-#include <queue>
-using namespace std;
-#include "../DataTypes.h"
-#include "../Packets/Serialize.h"
-//#include "../../Packets/Serialize.h"
-//"../UDP01/OldCode/Packets/Serialize.h"
+
 //
 // async_tcp_client.cpp
 // ~~~~~~~~~~~~~~~~~~~~
@@ -15,20 +10,34 @@ using namespace std;
 // Distributed under the Boost Software License, Version 1.0. (See accompanying
 // file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
 //
-
-#include <boost/asio/buffer.hpp>
-#include <boost/asio/io_context.hpp>
-#include <boost/asio/ip/tcp.hpp>
-#include <boost/asio/read_until.hpp>
-#include <boost/asio/steady_timer.hpp>
-#include <boost/asio/write.hpp>
-#include <boost/bind.hpp>
 #include <iostream>
 #include <string>
 #include <chrono>
+#include <queue>
+
+#include <boost/bind.hpp>
+#include <boost/thread.hpp>
+#include <boost/asio/io_service.hpp>
+//#include <boost/asio/buffer.hpp>
+#include <boost/asio/signal_set.hpp>
+#include <boost/core/noncopyable.hpp>
+
+#include <boost/asio/steady_timer.hpp>
+#include <boost/asio/ip/tcp.hpp>
+#include <boost/asio/read_until.hpp>
+#include <boost/asio/write.hpp>
+//#include <boost/asio/io_context.hpp>
+
+
+using namespace std;
 
 using boost::asio::steady_timer;
 using boost::asio::ip::tcp;
+using namespace boost::asio;
+#include "../DataTypes.h"
+#include "../Packets/BasePacket.h"
+#include "../Packets/Serialize.h"
+#include "../Packets/PacketFactory.h"
 
 //
 // This class manages socket timeouts by applying the concept of a deadline.
@@ -90,10 +99,10 @@ using boost::asio::ip::tcp;
 // newline character) every 10 seconds. In this example, no deadline is applied
 // to message sending.
 //
-class client
+class TCPClient
 {
 public:
-    client(boost::asio::io_context& io_context)
+    TCPClient(boost::asio::io_context& io_context)
         : stopped_(false),
         socket_(io_context),
         deadline_(io_context),
@@ -131,7 +140,7 @@ public:
         // Start the deadline actor. You will note that we're not setting any
         // particular deadline here. Instead, the connect and input actors will
         // update the deadline prior to each asynchronous operation.
-        deadline_.async_wait(boost::bind(&client::check_deadline, this));
+        deadline_.async_wait(boost::bind(&TCPClient::check_deadline, this));
     }
 
     // This function terminates all the actors to shut down the connection. It
@@ -159,7 +168,7 @@ private:
 
             // Start the asynchronous connect operation.
             socket_.async_connect(endpoint_iter->endpoint(),
-                boost::bind(&client::handle_connect,
+                boost::bind(&TCPClient::handle_connect,
                     this, _1, endpoint_iter));
         }
         else
@@ -222,7 +231,7 @@ private:
         // Start an asynchronous operation to read a newline-delimited message.
         boost::asio::async_read_until(socket_,
             boost::asio::dynamic_buffer(input_buffer_), '\n',
-            boost::bind(&client::handle_read, this, _1, _2));
+            boost::bind(&TCPClient::handle_read, this, _1, _2));
     }
 
     void handle_read(const boost::system::error_code& ec, std::size_t n)
@@ -267,7 +276,7 @@ private:
             Serialize::Out(buffer, outOffset, sp, 1);
             auto var = boost::asio::buffer(buffer, outOffset);
             boost::asio::async_write(socket_, var,
-                boost::bind(&client::handle_write, this, _1));
+                boost::bind(&TCPClient::handle_write, this, _1));
             PacketMethodFactory::Release(bp);
         }
         // Start an asynchronous operation to send a heartbeat message.
@@ -286,7 +295,7 @@ private:
         {
             // Wait 10 seconds before sending the next heartbeat.
             heartbeat_timer_.expires_after(boost::asio::chrono::seconds(10));
-            heartbeat_timer_.async_wait(boost::bind(&client::start_write, this));
+            heartbeat_timer_.async_wait(boost::bind(&TCPClient::start_write, this));
         }
         else
         {
@@ -347,7 +356,7 @@ private:
         }
 
         // Put the actor back to sleep.
-        deadline_.async_wait(boost::bind(&client::check_deadline, this));
+        deadline_.async_wait(boost::bind(&TCPClient::check_deadline, this));
     }
 
 private:
@@ -361,6 +370,37 @@ private:
 
     deque <shared_ptr<IPacketSerializable>> packetOutDeque;
     deque <shared_ptr<IPacketSerializable>> packetInDeque;
+};
+
+class ThreadedTcpClient
+{
+public:
+    ThreadedTcpClient(string ipAddr, U16 portAddr);
+    ~ThreadedTcpClient();
+
+    void    BeginService();
+
+    bool    IsConnected() const
+    {
+        if (tcpCient == nullptr)
+            return false;
+        return tcpCient->IsConnected();
+    }
+
+    void    PrepareStop();
+    void    Stop();
+
+private:
+
+    void Update();
+    TCPClient* tcpCient;
+    boost::asio::io_service myIoServiceType;
+
+    executor_work_guard<io_context::executor_type> work;
+    boost::thread_group threads;
+    string  ipAddress;
+    U16     portAddress;
+    bool    isThreadRunning;
 };
 /*
 int main(int argc, char* argv[])

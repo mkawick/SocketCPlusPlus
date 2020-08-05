@@ -23,8 +23,12 @@ public:
         threader->BeginService();
     }
     ~ServerSocket() {
-        if(threader)
+        if (threader)
+        {
+            threader->PrepareStop();
+            Sleep(10);
             threader->Stop();
+        }
         Sleep(50);
         delete threader;
     }

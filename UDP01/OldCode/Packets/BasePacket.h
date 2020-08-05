@@ -50,19 +50,6 @@ enum PacketType
 ///////////////////////////////////////////////////////////////
 ///////////////////////////////////////////////////////////////
 
-class IPacketSerializable //: public IBinarySerializable
-{
-public:
-    virtual bool  SerializeIn(const U8* data, int& bufferOffset, int minorVersion) = 0;
-    virtual bool  SerializeOut(U8* data, int& bufferOffset, int minorVersion = NetworkVersionMinor) const = 0;
-
-public:
-    virtual string GetName() = 0;
-    virtual U8 GetType() = 0;
-    virtual U8 GetSubType() = 0;
-    virtual IPacketSerializable* GetTypePtr() { return this; }
-};
-
 #define FactoryBoilerplate(C,T,ST)\
 string GetName()    override { return GetFactoryName(); }\
 U8 GetType()        override { return Type(); } \
