@@ -3,7 +3,7 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 16
 VisualStudioVersion = 16.0.29920.165
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "UDP01", "UDP01\UDP01.vcxproj", "{F53EF2B6-96AC-455A-AF14-DB606D72ED9E}"
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "UDP01 - Server", "UDP01\UDP01.vcxproj", "{F53EF2B6-96AC-455A-AF14-DB606D72ED9E}"
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "BoostASIO_Server02", "BoostASIO02\BoostASIO02.vcxproj", "{96049D49-4A15-4CB1-AD73-794CFD48EAAF}"
 EndProject
@@ -11,7 +11,7 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "BoostASIO_Client02", "Boost
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "UnitTest_BasicNetworking", "UnitTest_BasicNetworking\UnitTest_BasicNetworking.vcxproj", "{0048A74F-511A-425F-925F-1A240FDA55C7}"
 EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "ConsoleApplication1", "ConsoleApplication1\ConsoleApplication1.vcxproj", "{39C85B18-9C84-4C57-A3BB-ED4D1CA5EF86}"
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "PacketFactoryTesting", "ConsoleApplication1\ConsoleApplication1.vcxproj", "{39C85B18-9C84-4C57-A3BB-ED4D1CA5EF86}"
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "BoostASIO_Client03_TCP", "BoostASIO_Client03_TCP\BoostASIO_Client03_TCP.vcxproj", "{CC78F0E9-5251-47C1-A93B-EB1999FE6A24}"
 EndProject
@@ -20,6 +20,8 @@ EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "BoostASIO_Server03", "BoostASIO_Server03\BoostASIO_Server03.vcxproj", "{BCC73CB8-2580-4C31-914E-AFC1AB79423D}"
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "BoostASIO_Client04_TCP", "BoostASIO_Client04_TCP\BoostASIO_Client04_TCP.vcxproj", "{C2B134D2-7E0D-4DB0-BF85-B9EDFE7549D1}"
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "UDP01 - Client", "UDP01 - Client\UDP01 - Client.vcxproj", "{7ABF840E-4AB0-4CA8-B338-69D61BB19C2E}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -101,6 +103,14 @@ Global
 		{C2B134D2-7E0D-4DB0-BF85-B9EDFE7549D1}.Release|x64.Build.0 = Release|x64
 		{C2B134D2-7E0D-4DB0-BF85-B9EDFE7549D1}.Release|x86.ActiveCfg = Release|Win32
 		{C2B134D2-7E0D-4DB0-BF85-B9EDFE7549D1}.Release|x86.Build.0 = Release|Win32
+		{7ABF840E-4AB0-4CA8-B338-69D61BB19C2E}.Debug|x64.ActiveCfg = Debug|x64
+		{7ABF840E-4AB0-4CA8-B338-69D61BB19C2E}.Debug|x64.Build.0 = Debug|x64
+		{7ABF840E-4AB0-4CA8-B338-69D61BB19C2E}.Debug|x86.ActiveCfg = Debug|Win32
+		{7ABF840E-4AB0-4CA8-B338-69D61BB19C2E}.Debug|x86.Build.0 = Debug|Win32
+		{7ABF840E-4AB0-4CA8-B338-69D61BB19C2E}.Release|x64.ActiveCfg = Release|x64
+		{7ABF840E-4AB0-4CA8-B338-69D61BB19C2E}.Release|x64.Build.0 = Release|x64
+		{7ABF840E-4AB0-4CA8-B338-69D61BB19C2E}.Release|x86.ActiveCfg = Release|Win32
+		{7ABF840E-4AB0-4CA8-B338-69D61BB19C2E}.Release|x86.Build.0 = Release|Win32
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
