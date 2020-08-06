@@ -49,6 +49,7 @@ int main()
     
     
     t.detach();
+
     std::shared_ptr< MyThreadClass> threader;;
     std::shared_ptr<std::thread> t2(new thread(*threader));
     t2->detach();

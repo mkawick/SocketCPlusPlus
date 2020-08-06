@@ -3,27 +3,41 @@
 
 #include <iostream>
 #include <string>
-using namespace std;
+#include <thread>
+//using namespace std;
 #include "../UDP01/OldCode/Packets/CommonTypes.h"
 #include "../UDP01/OldCode/DataTypes.h"
 //#include "../UDP01/OldCode/ServerConstants.h"
 #include <winsock2.h>
 #include <ws2tcpip.h>
 #include <stdio.h>
+#include <conio.h>
 #pragma comment(lib, "Ws2_32.lib")
 
 //////////////////////////////////////////////////////////////////
 
 class UDPServer
 {
+private:
+    bool                isValid;
+    U16                 portId;
+    SOCKET              ReceivingSocket;
+    SOCKADDR_IN         ReceiverAddr;
+    char                ipString[INET_ADDRSTRLEN];
 public:
-    UDPServer(U16 port)
+    UDPServer(U16 port, bool isThreaded): isValid(false)
     {
 
     }
 
-    void operator()() {// main thread
-        int key = 0;
+    void operator()() 
+    {// main thread
+        if (isValid == false)
+            Init();
+
+        if (isValid == false)
+            return;
+     /*   int key = 0;
         while (key != '3')
         {
             std::cout << "-3-";
@@ -32,7 +46,38 @@ public:
             {
                 key = _getch();
             }
+        }*/
+        while (isValid)
+        {
+            Receive();
         }
+    }
+
+    void Init()
+    {
+        // Initialize Winsock version 2.2
+        if (NetworkingInit() == false)
+        {
+            isValid = false;
+            return;
+        }
+
+        ReceivingSocket = OpenDGramSocket();
+        if (ReceivingSocket == 0)
+        {
+            isValid = false;
+            return;
+        }
+
+        int                 Port = 5150;
+        SetupSocketDetails(ReceiverAddr, Port);
+
+        if (isValid = BindSocket(); isValid == false)
+            return;
+
+        GetLocalSocketInfo();
+
+        isValid = true;
     }
 
 private:
@@ -62,46 +107,56 @@ private:
                     SOCKADDR_IN         SenderAddr;
                     int                 SenderAddrSize = sizeof(SenderAddr);
                     // Call recvfrom() to get it then display the received data...
-                     int ByteReceived = recvfrom(ReceivingSocket, ReceiveBuf, BufLength,
-                        0, (SOCKADDR*)&SenderAddr, &SenderAddrSize);
+                    int ByteReceived = recvfrom(ReceivingSocket, ReceiveBuf, BufLength, 0, (SOCKADDR*)&SenderAddr, &SenderAddrSize);
                     if (ByteReceived > 0)
                     {
                         printf("Server: Total Bytes received : %d\n", ByteReceived);
                         printf("Server: The data is %s\\n", ReceiveBuf);
                     }
-
                     else if (ByteReceived <= 0)
                         printf("Server: Connection closed with error code : %ld\n", WSAGetLastError());
                     else
                         printf("Server: recvfrom() failed with error code : %d\n", WSAGetLastError());
                     // Some info on the sender side
                     getpeername(ReceivingSocket, (SOCKADDR*)&SenderAddr, &SenderAddrSize);
-                    printf("Server: Sending IP used : %s\n", ipStr);
+                    printf("Server: Sending IP used : %s\n", ipString);
                     printf("Server: Sending port used : %d\n", htons(SenderAddr.sin_port));
-
 
                 }
             }
 
         }
     }
-    void GetSomeInfoOnTheSocket()
+    void GetLocalSocketInfo()
     {
         // Some info on the receiver side...
         int addrlen = sizeof(ReceiverAddr);
         getsockname(ReceivingSocket, (SOCKADDR*)&ReceiverAddr, &addrlen);
-        char ipStr[INET_ADDRSTRLEN];
-        inet_ntop(ReceiverAddr.sin_family, (void*)&ReceiverAddr.sin_addr, (PSTR)ipStr, sizeof(ipStr));
+        
+        inet_ntop(ReceiverAddr.sin_family, (void*)&ReceiverAddr.sin_addr, (PSTR)ipString, sizeof(ipString));
 
-        printf("Server: Receiving IP(s) used : % s\n", ipStr);
+        printf("Server: Receiving IP(s) used : % s\n", ipString);
         printf("Server: Receiving port used : % d\n", htons(ReceiverAddr.sin_port));
         printf("Server: I\'m ready to receive a datagram...\n");
     }
 
     void CleanupAndExit()
     {
-        closesocket(ReceivingSocket); // Close the socket
-        WSACleanup(); // Do the clean up
+        printf("Server: Finished receiving.Closing the listening socket...\n");
+
+        if (closesocket(ReceivingSocket) != 0)
+            printf("Server: closesocket() failed!Error code : % ld\n", WSAGetLastError());
+        else
+            printf("Server: closesocket() is OK...\n");
+
+        // When your application is finished call WSACleanup.
+        printf("Server: Cleaning up...\n");
+        if (WSACleanup() != 0)
+            printf("Server: WSACleanup() failed!Error code : % ld\n", WSAGetLastError());
+        else
+            printf("Server: WSACleanup() is OK\n");
+
+        isValid = false;
     }
     // utils 
     bool NetworkingInit()
@@ -137,8 +192,7 @@ private:
         if (ReceivingSocket == INVALID_SOCKET)
         {
             printf("Server: Error at socket() : % ld\n", WSAGetLastError());
-            // Clean up
-            WSACleanup();// feels a bit wonky doing this here
+            CleanupAndExit();
 
             return 0;
         }
@@ -149,10 +203,7 @@ private:
         if (setsockopt(ReceivingSocket, SOL_SOCKET, SO_REUSEADDR, (char*)&enable, sizeof(enable)) < 0)
         {
             perror("setsockopt(SO_REUSEADDR) failed");
-            closesocket(ReceivingSocket);
-
-            // Do the clean up
-            WSACleanup();
+            CleanupAndExit();
             return 0;
         }
 
@@ -199,10 +250,16 @@ private:
 
 int main()
 {
-    UDPServer server (5150);
+    UDPServer server(5150, true);
+    //std::shared_ptr< UDPServer> threader;
+    //UDPServer threader;
+    std::thread t2(server);
+    //std::shared_ptr<std::thread> t2(new thread(*threader));
 
     std::cout << "Hello World!\n";
     cout << from_type<UDPServer>() << endl;
+    t2.detach();
+    _getch();
 }
 
 // Run program: Ctrl + F5 or Debug > Start Without Debugging menu
