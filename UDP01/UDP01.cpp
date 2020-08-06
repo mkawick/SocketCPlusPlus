@@ -68,14 +68,7 @@ SOCKET OpenDGramSocket()
 int main(int argc, char** argv)
 {
     
-    int                 Port = 5150;
-    char                ReceiveBuf[1024];
-    int                 BufLength = 1024;
-    SOCKADDR_IN         SenderAddr;
-    int                 SenderAddrSize = sizeof(SenderAddr);
     int                 ByteReceived = 5, SelectTiming;
-    char                ch = 'Y';
-
 
     // Initialize Winsock version 2.2
     if (NetworkingInit() == false)
@@ -86,6 +79,7 @@ int main(int argc, char** argv)
         return -1;
 
     SOCKADDR_IN         ReceiverAddr;
+    int                 Port = 5150;
     SetupSocketDetails(ReceiverAddr, Port);
 
 
@@ -139,6 +133,10 @@ int main(int argc, char** argv)
         {
             while (1)
             {
+				const int           BufLength = 1024;
+				char                ReceiveBuf[1024];
+               	SOCKADDR_IN         SenderAddr;
+                int                 SenderAddrSize = sizeof(SenderAddr);
                 // Call recvfrom() to get it then display the received data...
                 ByteReceived = recvfrom(ReceivingSocket, ReceiveBuf, BufLength,
                     0, (SOCKADDR*)&SenderAddr, &SenderAddrSize);
@@ -156,6 +154,8 @@ int main(int argc, char** argv)
                 getpeername(ReceivingSocket, (SOCKADDR*)&SenderAddr, &SenderAddrSize);
                 printf("Server: Sending IP used : %s\n", ipStr);
                 printf("Server: Sending port used : %d\n", htons(SenderAddr.sin_port));
+
+			
             }
         }
 
