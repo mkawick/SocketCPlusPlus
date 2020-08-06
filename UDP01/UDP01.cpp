@@ -10,58 +10,83 @@
 int recvfromTimeOutUDP(SOCKET socket, long sec, long usec);
 
 
-
-int main(int argc, char** argv)
+bool NetworkingInit()
 {
     WSADATA             wsaData;
-    SOCKET              ReceivingSocket;
-    SOCKADDR_IN         ReceiverAddr;
-    int                 Port = 5150;
-    char                ReceiveBuf[1024];
-    int                 BufLength = 1024;
-    SOCKADDR_IN         SenderAddr;
-    int                 SenderAddrSize = sizeof(SenderAddr);
-    int                 ByteReceived = 5, SelectTiming, ErrorCode;
-    char                ch = 'Y';
-
-
-
-    // Initialize Winsock version 2.2
-
     if (WSAStartup(MAKEWORD(2, 2), &wsaData) != 0)
     {
         printf("Server: WSAStartup failed with error % ld\n", WSAGetLastError());
-        return -1;
+        return false;
     }
     else
         printf("Server: The Winsock DLL status is % s.\n", wsaData.szSystemStatus);
+    return true;
+}
 
+void SetupSocketDetails(SOCKADDR_IN& ReceiverAddr, int port)
+{
+    // The IPv4 family
+    ReceiverAddr.sin_family = AF_INET;
+
+    // Port no. 5150
+    ReceiverAddr.sin_port = htons(port);
+
+    // From all interface (0.0.0.0)
+    ReceiverAddr.sin_addr.s_addr = htonl(INADDR_ANY);
+}
+
+SOCKET OpenDGramSocket()
+{
     // Create a new socket to receive datagrams on.
-    ReceivingSocket = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
+    SOCKET ReceivingSocket = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
 
     if (ReceivingSocket == INVALID_SOCKET)
     {
         printf("Server: Error at socket() : % ld\n", WSAGetLastError());
         // Clean up
-        WSACleanup();
-        // Exit with error
-        return -1;
+        WSACleanup();// feels a bit wonky doing this here
+        
+        return 0;
     }
     else
         printf("Server: socket() is OK!\n");
 
-    // Set up a SOCKADDR_IN structure that will tell bind that we
-    // want to receive datagrams from all interfaces using port 5150.
+    int enable = 1;
+    if (setsockopt(ReceivingSocket, SOL_SOCKET, SO_REUSEADDR, (char*)&enable, sizeof(enable)) < 0)
+    {
+        perror("setsockopt(SO_REUSEADDR) failed");
+        closesocket(ReceivingSocket);
 
-    // The IPv4 family
-    ReceiverAddr.sin_family = AF_INET;
+        // Do the clean up
+        WSACleanup();
+        return 0;
+    }
 
-    // Port no. 5150
-    ReceiverAddr.sin_port = htons(Port);
+    return ReceivingSocket;
+}
 
-    // From all interface (0.0.0.0)
-    ReceiverAddr.sin_addr.s_addr = htonl(INADDR_ANY);
+int main(int argc, char** argv)
+{
+    
+    int                 Port = 5150;
+    char                ReceiveBuf[1024];
+    int                 BufLength = 1024;
+    SOCKADDR_IN         SenderAddr;
+    int                 SenderAddrSize = sizeof(SenderAddr);
+    int                 ByteReceived = 5, SelectTiming;
+    char                ch = 'Y';
 
+
+    // Initialize Winsock version 2.2
+    if (NetworkingInit() == false)
+        return -1;
+    
+    SOCKET ReceivingSocket = OpenDGramSocket();
+    if (ReceivingSocket == 0)
+        return -1;
+
+    SOCKADDR_IN         ReceiverAddr;
+    SetupSocketDetails(ReceiverAddr, Port);
 
 
     // Associate the address information with the socket using bind.
@@ -85,14 +110,15 @@ int main(int argc, char** argv)
 
 
     // Some info on the receiver side...
-    getsockname(ReceivingSocket, (SOCKADDR*)&ReceiverAddr, (int*)sizeof(ReceiverAddr));
-    char ipStr[INET6_ADDRSTRLEN];
+    int addrlen = sizeof(ReceiverAddr);
+    getsockname(ReceivingSocket, (SOCKADDR*)&ReceiverAddr, &addrlen);
+    char ipStr[INET_ADDRSTRLEN];
     inet_ntop(ReceiverAddr.sin_family, (void*)&ReceiverAddr.sin_addr, (PSTR)ipStr, sizeof(ipStr));
 
     printf("Server: Receiving IP(s) used : % s\n", ipStr);
     printf("Server: Receiving port used : % d\n", htons(ReceiverAddr.sin_port));
     printf("Server: I\'m ready to receive a datagram...\n");
-    SelectTiming = recvfromTimeOutUDP(ReceivingSocket, 10, 0);
+    SelectTiming = recvfromTimeOutUDP(ReceivingSocket, 100, 0);
 
 
 
@@ -118,18 +144,18 @@ int main(int argc, char** argv)
                     0, (SOCKADDR*)&SenderAddr, &SenderAddrSize);
                 if (ByteReceived > 0)
                 {
-                    printf("Server: Total Bytes received : % d\n", ByteReceived);
-                    printf("Server: The data is \ % s\\n", ReceiveBuf);
+                    printf("Server: Total Bytes received : %d\n", ByteReceived);
+                    printf("Server: The data is %s\\n", ReceiveBuf);
                 }
 
                 else if (ByteReceived <= 0)
-                    printf("Server: Connection closed with error code : % ld\n",  WSAGetLastError());
+                    printf("Server: Connection closed with error code : %ld\n",  WSAGetLastError());
                 else
-                    printf("Server: recvfrom() failed with error code : % d\n", WSAGetLastError());
+                    printf("Server: recvfrom() failed with error code : %d\n", WSAGetLastError());
                 // Some info on the sender side
                 getpeername(ReceivingSocket, (SOCKADDR*)&SenderAddr, &SenderAddrSize);
-                printf("Server: Sending IP used : % s\n", ipStr);
-                printf("Server: Sending port used : % d\n", htons(SenderAddr.sin_port));
+                printf("Server: Sending IP used : %s\n", ipStr);
+                printf("Server: Sending port used : %d\n", htons(SenderAddr.sin_port));
             }
         }
 
