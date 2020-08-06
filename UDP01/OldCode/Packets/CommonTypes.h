@@ -6,15 +6,12 @@
 #include <string>
 #include <vector>
 #include <list>
-// D:\Develop\boost
-#include <boost/type_index.hpp>
 #pragma pack( push, 4 )
-
 
 template <typename T>
 constexpr string from_type()
 {
-    string ret = boost::typeindex::type_id_with_cvr<T>().pretty_name();
+    string ret = typeid(T).name();
     string search("class ");
     size_t position = ret.find(search, 0);
     if (position != string::npos)

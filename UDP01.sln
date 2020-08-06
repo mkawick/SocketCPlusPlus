@@ -25,6 +25,8 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "UDP01 - Client", "UDP01 - C
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "ThreadingTest01", "ThreadingTest01\ThreadingTest01.vcxproj", "{F100AA55-6401-4DC9-B46C-2EBF2E1E7B4B}"
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "UDP01-ThreadedServer", "UDP01-ThreadedServer\UDP01-ThreadedServer.vcxproj", "{8E5B52E7-4428-4EA6-AD9F-04A91DABD3E4}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|x64 = Debug|x64
@@ -121,6 +123,14 @@ Global
 		{F100AA55-6401-4DC9-B46C-2EBF2E1E7B4B}.Release|x64.Build.0 = Release|x64
 		{F100AA55-6401-4DC9-B46C-2EBF2E1E7B4B}.Release|x86.ActiveCfg = Release|Win32
 		{F100AA55-6401-4DC9-B46C-2EBF2E1E7B4B}.Release|x86.Build.0 = Release|Win32
+		{8E5B52E7-4428-4EA6-AD9F-04A91DABD3E4}.Debug|x64.ActiveCfg = Debug|x64
+		{8E5B52E7-4428-4EA6-AD9F-04A91DABD3E4}.Debug|x64.Build.0 = Debug|x64
+		{8E5B52E7-4428-4EA6-AD9F-04A91DABD3E4}.Debug|x86.ActiveCfg = Debug|Win32
+		{8E5B52E7-4428-4EA6-AD9F-04A91DABD3E4}.Debug|x86.Build.0 = Debug|Win32
+		{8E5B52E7-4428-4EA6-AD9F-04A91DABD3E4}.Release|x64.ActiveCfg = Release|x64
+		{8E5B52E7-4428-4EA6-AD9F-04A91DABD3E4}.Release|x64.Build.0 = Release|x64
+		{8E5B52E7-4428-4EA6-AD9F-04A91DABD3E4}.Release|x86.ActiveCfg = Release|Win32
+		{8E5B52E7-4428-4EA6-AD9F-04A91DABD3E4}.Release|x86.Build.0 = Release|Win32
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
