@@ -15,6 +15,7 @@
 using namespace std;
 #include<stdio.h>
 
+#include "../Common/Connection.h"
 #pragma comment(lib, "Ws2_32.lib")
 #pragma warning(disable:4996)
 
@@ -23,13 +24,9 @@ void error(char* msg)
     perror(msg);
     exit(EXIT_FAILURE);
 }
-int main()
+
+void Init()
 {
-	const int BUFLEN = 256;
-	struct sockaddr_in si_other;
-	int s, slen = sizeof(si_other);
-	char buf[BUFLEN];
-	char message[BUFLEN];
 	WSADATA wsa;
 
 	//Initialise winsock
@@ -40,13 +37,28 @@ int main()
 		exit(EXIT_FAILURE);
 	}
 	printf("Initialised.\n");
+}
 
-	//create socket
-	if ((s = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP)) == SOCKET_ERROR)
+SOCKET CreateSocket()
+{	
+	SOCKET socketCreated;
+	if ((socketCreated = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP)) == SOCKET_ERROR)
 	{
 		printf("socket() failed with error code : %d", WSAGetLastError());
 		exit(EXIT_FAILURE);
 	}
+
+	return socketCreated;
+}
+int main()
+{
+	//const int BUFLEN = 256;
+	struct sockaddr_in si_other;
+	int slen = sizeof(si_other);
+	Init();
+
+	//create socket
+	SOCKET socketCreated = CreateSocket();
 
 	//setup address structure
 	memset((char*)&si_other, 0, sizeof(si_other));
@@ -54,13 +66,40 @@ int main()
 	si_other.sin_port = htons(5150);
 	si_other.sin_addr.S_un.S_addr = inet_addr("127.0.0.1");
 
-	strcpy_s(message, "hello there");
+	CommsStateMachine sm(false);
 
-	if (sendto(s, message, strlen(message), 0, (struct sockaddr*) & si_other, slen) == SOCKET_ERROR)
+	const int bufferSize = 1024;
+	char buffer[bufferSize];
+
+	while(1)
 	{
-		printf("sendto() failed with error code : %d", WSAGetLastError());
-		exit(EXIT_FAILURE);
+		while (sm.ReadyToSend() == false)
+			Sleep(10);
+		
+		int bytesUsed = 0;
+		bool success = sm.DataSend(buffer, bufferSize, bytesUsed);
+		//strcpy_s(message, "hello there");
+
+		if (sendto(socketCreated, buffer, bytesUsed, 0, (struct sockaddr*) & si_other, slen) == SOCKET_ERROR)
+		{
+			printf("sendto() failed with error code : %d", WSAGetLastError());
+			exit(EXIT_FAILURE);
+		}
+
+		//memset(buf, '\0', BUFLEN);
+		//try to receive some data, this is a blocking call
+		if (sm.IsExpectingReceive())
+		{
+			// we need a select here
+			if (recvfrom(socketCreated, buffer, bufferSize, 0, (struct sockaddr*) & si_other, &slen) == SOCKET_ERROR)
+			{
+				printf("recvfrom() failed with error code : %d", WSAGetLastError());
+				exit(EXIT_FAILURE);
+			}
+			sm.DataReceive(buffer, slen);
+		}
 	}
+		
 	//start communication
 	/*while (1)
 	{
@@ -74,7 +113,7 @@ int main()
 		//clear the buffer by filling null, it might have previously received data
 		memset(buf, '\0', BUFLEN);
 		//try to receive some data, this is a blocking call
-		if (recvfrom(s, buf, BUFLEN, 0, (struct sockaddr*) & si_other, &slen) == SOCKET_ERROR)
+		if (recvfrom(socketCreated, buf, BUFLEN, 0, (struct sockaddr*) & si_other, &slen) == SOCKET_ERROR)
 		{
 			printf("recvfrom() failed with error code : %d", WSAGetLastError());
 			exit(EXIT_FAILURE);
@@ -83,7 +122,7 @@ int main()
 		puts(buf);
 	}*/
 
-	closesocket(s);
+	closesocket(socketCreated);
 	WSACleanup();
 
 	return 0;

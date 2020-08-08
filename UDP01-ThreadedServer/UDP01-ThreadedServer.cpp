@@ -4,17 +4,25 @@
 #include <iostream>
 #include <string>
 #include <thread>
+#include <map>
 //using namespace std;
-#include "../UDP01/OldCode/Packets/CommonTypes.h"
-#include "../UDP01/OldCode/DataTypes.h"
+
+
+
 //#include "../UDP01/OldCode/ServerConstants.h"
 #include <winsock2.h>
 #include <ws2tcpip.h>
 #include <stdio.h>
 #include <conio.h>
 #pragma comment(lib, "Ws2_32.lib")
+#include "../Common/Connection.h"
 
 //////////////////////////////////////////////////////////////////
+typedef std::pair <ULONG, U16> SocketPair;
+
+
+
+
 
 class UDPServer
 {
@@ -24,8 +32,13 @@ private:
     SOCKET              ReceivingSocket;
     SOCKADDR_IN         ReceiverAddr;
     char                ipString[INET_ADDRSTRLEN];
+
+    bool                extraLogging;
+
+    
+    std::map< SocketPair, Connection*> connections;
 public:
-    UDPServer(U16 port, bool isThreaded): isValid(false)
+    UDPServer(U16 port, bool isThreaded): isValid(false), extraLogging(false)
     {
 
     }
@@ -37,19 +50,10 @@ public:
 
         if (isValid == false)
             return;
-     /*   int key = 0;
-        while (key != '3')
-        {
-            std::cout << "-3-";
-            Sleep(10);
-            if (_kbhit())
-            {
-                key = _getch();
-            }
-        }*/
         while (isValid)
         {
             Receive();
+            ServiceOutgoingConnections();
         }
     }
 
@@ -83,13 +87,16 @@ public:
 private:
     void Receive()
     {
-        int SelectTiming = recvfromTimeOutUDP(ReceivingSocket, 100, 0);
+        int socketBlockInSeconds = 0;
+        int socketBlockInMicroSeconds = 20000;
+        int SelectTiming = ReceiveFromSocketWithTimeOut(ReceivingSocket, socketBlockInSeconds, socketBlockInMicroSeconds);
 
         switch (SelectTiming)
         {
         case 0:
             // Timed out, do whatever you want to handle this situation
-            printf("Server : Timeout lor while waiting you bastard client!...\n");
+            if(extraLogging) 
+                cout << "Server : Timeout lor while waiting you bastard client!..." << endl;
             break;
 
         case -1:
@@ -100,33 +107,100 @@ private:
 
         default:
             {
-                while (1)
-                {
-                    const int           BufLength = 1024;
-                    char                ReceiveBuf[1024];
-                    SOCKADDR_IN         SenderAddr;
-                    int                 SenderAddrSize = sizeof(SenderAddr);
-                    // Call recvfrom() to get it then display the received data...
-                    int ByteReceived = recvfrom(ReceivingSocket, ReceiveBuf, BufLength, 0, (SOCKADDR*)&SenderAddr, &SenderAddrSize);
-                    if (ByteReceived > 0)
-                    {
-                        printf("Server: Total Bytes received : %d\n", ByteReceived);
-                        printf("Server: The data is %s\\n", ReceiveBuf);
-                    }
-                    else if (ByteReceived <= 0)
-                        printf("Server: Connection closed with error code : %ld\n", WSAGetLastError());
-                    else
-                        printf("Server: recvfrom() failed with error code : %d\n", WSAGetLastError());
-                    // Some info on the sender side
-                    getpeername(ReceivingSocket, (SOCKADDR*)&SenderAddr, &SenderAddrSize);
-                    printf("Server: Sending IP used : %s\n", ipString);
-                    printf("Server: Sending port used : %d\n", htons(SenderAddr.sin_port));
-
-                }
+                ReceiveAllDataFromEndpoint();
             }
-
         }
     }
+
+    void ReceiveAllDataFromEndpoint()
+    {
+        const int           BufLength = 1024;
+        char                ReceiveBuf[BufLength];
+        SOCKADDR_IN         SenderAddr;
+        int SenderAddrSize = sizeof(SenderAddr);
+        int BytesReceived = 0;
+        do
+        {
+            // recvfrom is blocking, so I use select to tell me that there is data before receiving
+            BytesReceived = recvfrom(ReceivingSocket, ReceiveBuf, BufLength, 0, (SOCKADDR*)&SenderAddr, &SenderAddrSize);
+            if (BytesReceived == SOCKET_ERROR)
+            {
+                printf("Server: recvfrom() failed with error code : %id\n", WSAGetLastError());
+                break;
+            }
+            else if (BytesReceived == 0)
+            {
+                break;
+            }
+            LogBytesReceived(BytesReceived, ReceiveBuf);
+            
+            PassBufferToConnection(SenderAddr, ReceiveBuf, BufLength);
+        } while (BytesReceived > BufLength);
+    }
+
+    void PassBufferToConnection(SOCKADDR_IN SenderAddr, char* buffer, int bufferLen )
+    {
+        int SenderAddrSize = sizeof(SenderAddr);
+        // Some info on the sender side
+        getpeername(ReceivingSocket, (SOCKADDR*)&SenderAddr, &SenderAddrSize);
+        ULONG senderKey = SenderAddr.sin_addr.S_un.S_addr;
+
+        //-----------------------------------------
+        Connection* connPtr;
+        const auto deets = SocketPair(senderKey, SenderAddr.sin_port);
+        auto foundItem = connections.find(deets);
+        if (foundItem != connections.end())
+        {
+            connPtr = foundItem->second;
+        }
+        else
+        {
+            auto newItem = connections.insert(std::pair(deets, new Connection(ReceivingSocket, SenderAddr, SenderAddr.sin_port)));
+            connPtr = newItem.first->second;
+        }
+        
+        connPtr->HandleDataIn(buffer, bufferLen);
+        LogReceive(SenderAddr, SenderAddrSize);
+    }
+
+    void LogBytesReceived(int BytesReceived, const char* ReceiveBuf)
+    {
+        if (extraLogging)
+        {
+            printf("Server: Total Bytes received : %d\n", BytesReceived);
+            printf("Server: The data is %s\\n", ReceiveBuf);
+        }
+    }
+
+    void LogReceive(SOCKADDR_IN SenderAddr, int SenderAddrSize)
+    {
+        if (extraLogging)
+        {
+            char ipAddressBuffer[INET_ADDRSTRLEN];
+            int err = getnameinfo((struct sockaddr*) & SenderAddr, SenderAddrSize, ipAddressBuffer, sizeof(ipAddressBuffer),
+                0, 0, NI_NUMERICHOST);
+            printf("Server: Sending IP used : %s\n", ipAddressBuffer);
+            printf("Server: Sending port used : %d\n", htons(SenderAddr.sin_port));
+        }
+    }
+
+    void ServiceOutgoingConnections()
+    {
+        for (auto connection : connections)
+        {
+            if (connection.second->NeedsService())
+                connection.second->RunService();
+            if (connection.second->HasExpired())
+            {
+                // todo, signal architecture that things are gone
+                connection.second->Cleanup();
+                delete connection.second;
+                auto it = connections.find(connection.first);
+                connections.erase(it);
+            }
+        }
+    }
+
     void GetLocalSocketInfo()
     {
         // Some info on the receiver side...
@@ -156,6 +230,11 @@ private:
         else
             printf("Server: WSACleanup() is OK\n");
 
+        for (auto connection : connections)
+        {
+            connection.second->Cleanup();
+            delete connection.second;
+        }
         isValid = false;
     }
     // utils 
@@ -225,7 +304,7 @@ private:
         return true;
     }
 
-    int recvfromTimeOutUDP(SOCKET socket, long sec, long usec)
+    int ReceiveFromSocketWithTimeOut(SOCKET socket, long sec, long usec)
     {
         // Setup timeval variable
         struct timeval timeout;
@@ -258,7 +337,8 @@ int main()
 
     std::cout << "Hello World!\n";
     cout << from_type<UDPServer>() << endl;
-    t2.detach();
+    //t2.detach();
+    t2.join();
     _getch();
 }
 
